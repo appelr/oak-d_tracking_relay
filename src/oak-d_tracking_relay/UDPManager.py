@@ -10,27 +10,21 @@ class UDP:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.config = config
     
-    def send(self, trackingData: Dict):
-        # Zeitstempel extrahieren, damit beide Pakete synchronisierbar bleiben
-        ts = trackingData.get("ts", 0)
-
-        head = trackingData.get("head", {})
-        hands = trackingData.get("hands", {})
-
-        if head: 
+    def send(self, headData: Dict, handData: Dict, timeStamp: float):
+        if headData: 
             head_packet = {
-                "ts": ts,
-                "head": trackingData["head"]
+                "ts": timeStamp,
+                "head": headData
             }
             self.sendInternal(head_packet, self.config.udp_port_head)
 
-        if hands:
-            hands_packet = {"ts": ts}
-            if "left_hand" in trackingData:
-                hands_packet["left_hand"] = trackingData["left_hand"]
+        if handData:
+            hands_packet = {"ts": timeStamp}
+            if "left_hand" in handData:
+                hands_packet["left_hand"] = handData["left_hand"]
                 
-            if "right_hand" in trackingData:
-                hands_packet["right_hand"] = trackingData["right_hand"]
+            if "right_hand" in handData:
+                hands_packet["right_hand"] = handData["right_hand"]
 
             self.sendInternal(hands_packet, self.config.udp_port_hands)
         

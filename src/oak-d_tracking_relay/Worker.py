@@ -6,7 +6,7 @@ from .CameraManager import OakD
 
 def main():
     config = Configuration.load("config.json")
-    engine = TrackingEngine(camera, config)
+    engine = TrackingEngine(config)
     udpManager = UDP(config)
 
     try:
@@ -14,7 +14,7 @@ def main():
             while True:
                 frameL, frameR, timeStamp = camera.get_frames()
 
-                if frameL is None:
+                if frameL is None or frameR is None:
                         time.sleep(0.002)
                         continue
                 

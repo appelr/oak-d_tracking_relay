@@ -1,0 +1,39 @@
+[build-system]
+# Definiert, welches Werkzeug den Build durchführt.
+# Setuptools ist der Standard.
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+# --- Metadaten ---
+name = "oakd_tracking_relay"
+version = "0.1.0"
+description = "Captures Face and Hand position from Oak-D pro Camera and sends them via UDP."
+readme = "README.md"
+authors = [
+  { name = "Randolf Appel", email = "appelr@th-koeln.de" },
+  { name = "Duyanh Do", email = "duydo@th-koeln.de" }
+]
+license = { text = "MIT" }
+requires-python = ">=3.12"
+
+# --- Klassifizierung (Optional, aber gut für PyPI) ---
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+# --- Echte Abhängigkeiten (Was dein Code zum Laufen braucht) ---
+# Das ersetzt die requirements.txt für die Bibliothek selbst
+dependencies = [
+    "depthai>=2.0,<3.0",
+    "opencv-python",
+    "mediapipe>=0.10.14,<0.10.15",
+    "nicegui",
+    "numpy",
+    "orjson"
+]
+
+[project.scripts]
+start-tracking = "oakd_tracking_relay.Worker:main"

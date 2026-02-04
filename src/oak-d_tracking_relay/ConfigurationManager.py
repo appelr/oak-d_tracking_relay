@@ -5,7 +5,7 @@ import os
 import sys
 
 @dataclass
-class ConfigurationManager:
+class Configuration:
     # Netzwerk
     udp_ip: str = "127.0.0.1"
     udp_port_head: int = 5005

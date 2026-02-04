@@ -3,10 +3,10 @@ import orjson
 
 from typing import Dict
 
-from .ConfigurationManager import ConfigurationManager
+from .ConfigurationManager import Configuration
 
-class UDPManager:
-    def __init__(self, config: ConfigurationManager):
+class UDP:
+    def __init__(self, config: Configuration):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.config = config
     

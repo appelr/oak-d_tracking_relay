@@ -6,6 +6,8 @@
     "exposure_us": 800,
     "iso": 200,
     "ir_laser_intensity": 1.0,
+    "resolutionWidth": 640,
+    "resolutionHeight": 400,
     "mp_min_detection": 0.4,
     "mp_min_tracking": 0.2
 }

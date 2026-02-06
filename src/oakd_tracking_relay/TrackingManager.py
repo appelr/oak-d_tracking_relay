@@ -5,6 +5,7 @@ import mediapipe as mp
 from typing import Dict, Tuple
 
 from .ConfigurationManager import Configuration
+from .Utils import Utils
 
 class TrackingEngine:
     def __init__(self, config: Configuration):
@@ -39,34 +40,39 @@ class HeadTracker:
 
         if lResult.multi_face_landmarks and rResult.multi_face_landmarks:
             lLandmarks = lResult.multi_face_landmarks[0].landmark
-            lLandmarks_iris_l, lLandmarks_iris_r = lLandmarks[468], lLandmarks[473]
+            print(lLandmarks[468])
+            print(type(lLandmarks[468]))
+            lLandmarks_iris_l = Utils.normalizeCoordinate(lLandmarks[468])
+            lLandmarks_iris_r = Utils.normalizeCoordinate(lLandmarks[473])
+
 
             rLandmarks = rResult.multi_face_landmarks[0].landmark
-            rLandmarks_iris_l, rLandmarks_iris_r = rLandmarks[468], rLandmarks[473]   
+            rLandmarks_iris_l = Utils.normalizeCoordinate(rLandmarks[468])
+            rLandmarks_iris_r = Utils.normalizeCoordinate(rLandmarks[473])
 
             headData = {
                 "Head": {
                     "CAM L": {
                         "Iris L": {
-                            "x": float((lLandmarks_iris_l.x * -1.0) + 0.5),
-                            "y": float((lLandmarks_iris_l.y * -1.0) + 0.5),
+                            "x": lLandmarks_iris_l[0],
+                            "y": lLandmarks_iris_l[1],
                             "z": 0.0
                         },
                         "Iris R": {
-                            "x": float((lLandmarks_iris_r.x * -1.0) + 0.5),
-                            "y": float((lLandmarks_iris_r.y * -1.0) + 0.5),
+                            "x": lLandmarks_iris_r[0],
+                            "y": lLandmarks_iris_r[1],
                             "z": 0.0
                         }
                     },
                     "CAM R": {
                         "Iris L": {
-                            "x": float((rLandmarks_iris_l.x * -1.0) - 0.5),
-                            "y": float((rLandmarks_iris_l.y * -1.0) - 0.5),
+                            "x": rLandmarks_iris_l[0],
+                            "y": rLandmarks_iris_l[1],
                             "z": 0.0
                         },
                         "Iris R": {
-                            "x": float((rLandmarks_iris_r.x * -1.0) - 0.5),
-                            "y": float((rLandmarks_iris_r.y * -1.0) - 0.5),
+                            "x": rLandmarks_iris_r[0],
+                            "y": rLandmarks_iris_r[1],
                             "z": 0.0
                         }
                     }
@@ -92,15 +98,15 @@ class HandTracker:
         
         if lResult.multi_hand_landmarks:
             for lLandmarks, handedness in zip(lResult.multi_hand_landmarks, lResult.multi_handedness):
-                handCenter = lLandmarks.landmark[9]
+                handCenter = Utils.normalizeCoordinate(lLandmarks.landmark[9])
 
                 # Hände tauschen um Ich-Perspektive zu erzeugen
                 handLabel = handedness.classification[0].label
                 handLabel = "right_hand" if handLabel == "Left" else "left_hand"
 
                 handData[handLabel] = {
-                    "x": float(handCenter.x * 1.0),
-                    "y": float(handCenter.y * -1.0),
+                    "x": handCenter[0] ,
+                    "y": handCenter[1],
                     "z": 0.0
                 }
         

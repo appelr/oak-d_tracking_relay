@@ -16,6 +16,8 @@ class Configuration:
     exposure_us: int = 800
     iso: int = 200
     ir_laser_intensity: float = 1.0
+    resolutionWidth: int = 640
+    resolutionHeight: int = 400
     
     # Tracking Filter
     mp_min_detection: float = 0.4

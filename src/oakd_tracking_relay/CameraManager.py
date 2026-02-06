@@ -1,4 +1,5 @@
 import depthai as dai
+import numpy as np
 
 from .ConfigurationManager import Configuration
 

@@ -1,8 +1,10 @@
 import time
+
 from .ConfigurationManager import Configuration
 from .TrackingManager import TrackingEngine
 from .UDPManager import UDP
 from .CameraManager import OakD
+from .Utils import RectificationUtils
 
 def main():
     config = Configuration.load("config.json")
@@ -11,6 +13,7 @@ def main():
 
     try:
         with OakD(config) as camera:
+            rectifier = RectificationUtils(camera, config)
             while True:
                 frameL, frameR, timeStamp = camera.get_frames()
 
@@ -19,6 +22,7 @@ def main():
                         print("Frame skipped")
                         continue
                 
+                frameL, frameR = rectifier.rectifyFrames(frameL, frameR)
                 headData, handData = engine.processFrame(frameL, frameR)
                 
                 if headData or handData:

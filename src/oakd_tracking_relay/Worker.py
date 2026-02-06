@@ -5,7 +5,6 @@ from .UDPManager import UDP
 from .CameraManager import OakD
 
 def main():
-    Configuration.save()
     config = Configuration.load("config.json")
     engine = TrackingEngine(config)
     udpManager = UDP(config)

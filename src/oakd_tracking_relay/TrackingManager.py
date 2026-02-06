@@ -2,10 +2,9 @@ import cv2
 import numpy as np
 import mediapipe as mp
 
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 
 from .ConfigurationManager import Configuration
-from .Utils import Utils
 
 class TrackingEngine:
     def __init__(self, config: Configuration):
@@ -13,14 +12,14 @@ class TrackingEngine:
         self.headTracker = HeadTracker(config)
         self.handTracker = HandTracker(config)
 
-    def processFrame(self, frameL: np.ndarray, frameR: np.ndarray) -> Tuple[Dict, Dict]:
+    def processStereoFrame(self, frameL: np.ndarray, frameR: np.ndarray) -> Tuple[Dict, Dict, Dict, Dict]:
         lRGB = cv2.cvtColor(frameL, cv2.COLOR_GRAY2RGB)
         rRGB = cv2.cvtColor(frameR, cv2.COLOR_GRAY2RGB)
         
-        headData = self.headTracker.process(lRGB, rRGB)
-        handData = self.handTracker.process(lRGB)
+        irisL, irisR = self.headTracker.process(lRGB, rRGB)
+        handL, handR = self.handTracker.process(lRGB)
 
-        return headData, handData
+        return irisL, irisR, handL, handR
 
 class HeadTracker:
     def __init__(self, config: Configuration):
@@ -32,54 +31,49 @@ class HeadTracker:
             min_tracking_confidence=config.mp_min_tracking)
         
 
-    def process(self, lRGB: np.ndarray, rRGB: np.ndarray) -> Dict:
-        headData = {}
+    def process(self, lRGB: np.ndarray, rRGB: np.ndarray) -> Tuple[Dict, Dict]:
+        irisL = {}
+        irisR = {}
 
+        # Execute model processing
         lResult = self.model.process(lRGB)
         rResult = self.model.process(rRGB)
 
         if lResult.multi_face_landmarks and rResult.multi_face_landmarks:
             lLandmarks = lResult.multi_face_landmarks[0].landmark
-            print(lLandmarks[468])
-            print(type(lLandmarks[468]))
-            lLandmarks_iris_l = Utils.normalizeCoordinate(lLandmarks[468])
-            lLandmarks_iris_r = Utils.normalizeCoordinate(lLandmarks[473])
-
-
             rLandmarks = rResult.multi_face_landmarks[0].landmark
-            rLandmarks_iris_l = Utils.normalizeCoordinate(rLandmarks[468])
-            rLandmarks_iris_r = Utils.normalizeCoordinate(rLandmarks[473])
 
-            headData = {
-                "Head": {
-                    "CAM L": {
-                        "Iris L": {
-                            "x": lLandmarks_iris_l[0],
-                            "y": lLandmarks_iris_l[1],
-                            "z": 0.0
-                        },
-                        "Iris R": {
-                            "x": lLandmarks_iris_r[0],
-                            "y": lLandmarks_iris_r[1],
-                            "z": 0.0
-                        }
-                    },
-                    "CAM R": {
-                        "Iris L": {
-                            "x": rLandmarks_iris_l[0],
-                            "y": rLandmarks_iris_l[1],
-                            "z": 0.0
-                        },
-                        "Iris R": {
-                            "x": rLandmarks_iris_r[0],
-                            "y": rLandmarks_iris_r[1],
-                            "z": 0.0
-                        }
-                    }
+            # Left iris
+            lLandmarksIrisL = lLandmarks[468]
+            rLandmarksIrisL = rLandmarks[468]
+
+            # Right iris
+            lLandmarksIrisR = lLandmarks[473]
+            rLandmarksIrisR = rLandmarks[473]
+
+            irisL = {
+                "left_cam":  {
+                    "x": lLandmarksIrisL.x,
+                    "y": lLandmarksIrisL.y
+                },
+                "right_cam": {
+                    "x": rLandmarksIrisL.x,
+                    "y": rLandmarksIrisL.y
+                }
+            }
+            
+            irisR = {
+                "left_cam":  {
+                    "x": lLandmarksIrisR.x,
+                    "y": lLandmarksIrisR.y
+                },
+                "right_cam": {
+                    "x": rLandmarksIrisR.x,
+                    "y": rLandmarksIrisR.y
                 }
             }
 
-        return headData
+        return irisL, irisR
 
 class HandTracker:
     def __init__(self, config: Configuration):
@@ -91,23 +85,29 @@ class HandTracker:
             min_tracking_confidence=config.mp_min_tracking
         )
 
-    def process(self, lRGB: np.ndarray) -> Dict:
-        handData = {}
+    def process(self, lRGB: np.ndarray) -> Tuple[Dict, Dict]:
+        handL = {}
+        handR = {}
 
         lResult = self.model.process(lRGB)
         
         if lResult.multi_hand_landmarks:
             for lLandmarks, handedness in zip(lResult.multi_hand_landmarks, lResult.multi_handedness):
-                handCenter = Utils.normalizeCoordinate(lLandmarks.landmark[9])
-
-                # Hände tauschen um Ich-Perspektive zu erzeugen
+                handCenter = lLandmarks.landmark[9]
                 handLabel = handedness.classification[0].label
-                handLabel = "right_hand" if handLabel == "Left" else "left_hand"
 
-                handData[handLabel] = {
-                    "x": handCenter[0] ,
-                    "y": handCenter[1],
-                    "z": 0.0
-                }
+                # Swap hands for ego perspective
+                if handLabel is "right_hand":
+                    handL = {
+                        "x": handCenter.x ,
+                        "y": handCenter.y,
+                        "z": 0.0
+                    }
+                if handLabel is "left_hand":
+                    handR = {
+                        "x": handCenter.x ,
+                        "y": handCenter.y,
+                        "z": 0.0
+                    }
         
-        return handData
+        return handL, handR

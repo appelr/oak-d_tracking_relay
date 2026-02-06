@@ -10,24 +10,26 @@ class UDP:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.config = config
     
-    def send(self, headData: Dict, handData: Dict, timeStamp: float):
-        if headData: 
-            head_packet = {
+    def send(self, irisL: Dict, irisR: Dict, handL: Dict, handR: Dict, timeStamp: float):
+        if irisL and irisR: 
+            head = {
                 "ts": timeStamp,
-                "head": headData
+                "head": {
+                    "irisL": irisL,
+                    "irisR": irisR
+                }
             }
-            self.sendInternal(head_packet, self.config.udp_port_head)
+            self.sendInternal(head, self.config.udp_port_head)
 
-        if handData:
-            hands_packet = {"ts": timeStamp}
-            if "left_hand" in handData:
-                hands_packet["left_hand"] = handData["left_hand"]
+        if handL or handR:
+            hands = {"ts": timeStamp, "hands": {}}
+            if handL:
+                hands["hands"]["left_hand"] = handL
                 
-            if "right_hand" in handData:
-                hands_packet["right_hand"] = handData["right_hand"]
+            if handR:
+                hands["hands"]["right_hand"] = handR
 
-            self.sendInternal(hands_packet, self.config.udp_port_hands)
-        
+            self.sendInternal(hands, self.config.udp_port_hands)
 
     def sendInternal(self, payload: Dict, port: int):
         try:

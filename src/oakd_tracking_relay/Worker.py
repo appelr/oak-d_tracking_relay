@@ -4,7 +4,7 @@ from .ConfigurationManager import Configuration
 from .TrackingManager import TrackingEngine
 from .UDPManager import UDP
 from .CameraManager import OakD
-from .Utils import RectificationUtils
+from .Utils import ProcessingUtils
 
 def main():
     config = Configuration.load("config.json")
@@ -13,7 +13,7 @@ def main():
 
     try:
         with OakD(config) as camera:
-            rectifier = RectificationUtils(camera, config)
+            processingUtils = ProcessingUtils(camera, config)
             while True:
                 frameL, frameR, timeStamp = camera.get_frames()
 
@@ -22,12 +22,34 @@ def main():
                         print("Frame skipped")
                         continue
                 
-                frameL, frameR = rectifier.rectifyFrames(frameL, frameR)
-                headData, handData = engine.processFrame(frameL, frameR)
-                
-                if headData or handData:
-                    print("Hand/Head found") 
-                    udpManager.send(headData, handData, timeStamp)
+                # Rectify
+                frameL, frameR = processingUtils.rectifyStereoFrame(frameL, frameR)
+
+                # Process
+                stereoLandmarksIrisL, stereoLandmarksIrisR, landmarksHandL, landmarksHandR = engine.processStereoFrame(frameL, frameR)
+
+                # Initialization
+                irisL3D = {}
+                irisR3D = {}
+                handL = {}
+                handR = {}
+
+                if stereoLandmarksIrisL and stereoLandmarksIrisR:
+                    # Normalized Landmarks to Pixel
+                    irisL2D = processingUtils.stereoLandmarkToPixelCoordinates(stereoLandmarksIrisL)
+                    irisR2D = processingUtils.stereoLandmarkToPixelCoordinates(stereoLandmarksIrisR)            
+
+                    # Triangulate to 3D coordinates
+                    irisL3D = processingUtils.triangulatePoints(irisL2D)
+                    irisR3D = processingUtils.triangulatePoints(irisR2D)
+
+                if landmarksHandL:
+                    handL= processingUtils.landmarkToPixelCoordinates(landmarksHandL["x"], landmarksHandL["y"])
+
+                if landmarksHandR:
+                    handR = processingUtils.landmarkToPixelCoordinates(landmarksHandR["x"], landmarksHandR["y"])
+
+                udpManager.send(irisL3D, irisR3D, handL, handR, timeStamp)
 
     except Exception as e:
         print(f"Error in Worker: {e}", flush=True)

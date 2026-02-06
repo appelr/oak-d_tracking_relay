@@ -33,42 +33,42 @@ class HeadTracker:
 
     def process(self, lRGB: np.ndarray, rRGB: np.ndarray) -> Dict:
         headData = {}
-        
+
         lResult = self.model.process(lRGB)
         rResult = self.model.process(rRGB)
 
-        if lResult.multi_face_landmarks:
+        if lResult.multi_face_landmarks and rResult.multi_face_landmarks:
             lLandmarks = lResult.multi_face_landmarks[0].landmark
-            
             lLandmarks_iris_l, lLandmarks_iris_r = lLandmarks[468], lLandmarks[473]
-            
-            if rResult.multi_face_landmarks:
-                rLandmarks = rResult.multi_face_landmarks[0].landmark
-                rLandmarks_iris_l, rLandmarks_iris_r = rLandmarks[468], rLandmarks[473]
-                
-            headData["head"] = {
-                "CAM L": {
-                    "Iris L": {
-                        "x": float(lLandmarks_iris_l.x * -1.0),
-                        "y": float(lLandmarks_iris_l.y * -1.0),
-                        "z": 0.0
+
+            rLandmarks = rResult.multi_face_landmarks[0].landmark
+            rLandmarks_iris_l, rLandmarks_iris_r = rLandmarks[468], rLandmarks[473]   
+
+            headData = {
+                "Head": {
+                    "CAM L": {
+                        "Iris L": {
+                            "x": float((lLandmarks_iris_l.x * -1.0) + 0.5),
+                            "y": float((lLandmarks_iris_l.y * -1.0) + 0.5),
+                            "z": 0.0
+                        },
+                        "Iris R": {
+                            "x": float((lLandmarks_iris_r.x * -1.0) + 0.5),
+                            "y": float((lLandmarks_iris_r.y * -1.0) + 0.5),
+                            "z": 0.0
+                        }
                     },
-                    "Iris R": {
-                        "x": float(lLandmarks_iris_r.x * -1.0),
-                        "y": float(lLandmarks_iris_r.y * -1.0),
-                        "z": 0.0
-                    }
-                },
-                "CAM R": {
-                    "Iris L": {
-                        "x": float(rLandmarks_iris_l.x * -1.0),
-                        "y": float(rLandmarks_iris_l.y * -1.0),
-                        "z": 0.0
-                    },
-                    "Iris R": {
-                        "x": float(rLandmarks_iris_r.x * -1.0),
-                        "y": float(rLandmarks_iris_r.y * -1.0),
-                        "z": 0.0
+                    "CAM R": {
+                        "Iris L": {
+                            "x": float((rLandmarks_iris_l.x * -1.0) - 0.5),
+                            "y": float((rLandmarks_iris_l.y * -1.0) - 0.5),
+                            "z": 0.0
+                        },
+                        "Iris R": {
+                            "x": float((rLandmarks_iris_r.x * -1.0) - 0.5),
+                            "y": float((rLandmarks_iris_r.y * -1.0) - 0.5),
+                            "z": 0.0
+                        }
                     }
                 }
             }

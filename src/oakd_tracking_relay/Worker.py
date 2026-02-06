@@ -5,6 +5,7 @@ from .UDPManager import UDP
 from .CameraManager import OakD
 
 def main():
+    Configuration.save()
     config = Configuration.load("config.json")
     engine = TrackingEngine(config)
     udpManager = UDP(config)
@@ -16,11 +17,13 @@ def main():
 
                 if frameL is None or frameR is None:
                         time.sleep(0.002)
+                        print("Frame skipped")
                         continue
                 
                 headData, handData = engine.processFrame(frameL, frameR)
                 
-                if headData or handData: 
+                if headData or handData:
+                    print("Hand/Head found") 
                     udpManager.send(headData, handData, timeStamp)
 
     except Exception as e:

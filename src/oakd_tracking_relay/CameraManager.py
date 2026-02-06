@@ -59,6 +59,9 @@ class OakD:
         
         xoutRight = pipeline.create(dai.node.XLinkOut)
         xoutRight.setStreamName("right")
+
+        monoLeft.out.link(xoutLeft.input)
+        monoRight.out.link(xoutRight.input)
         
         return pipeline
 
@@ -90,7 +93,7 @@ class OakD:
             inRight = self.qRight.get()
 
         if inLeft is not None and inRight is not None:
-            timeStamp = inLeft.getTimestamp()
+            timeStamp = inLeft.getTimestamp().total_seconds() * 1000
             return inLeft.getCvFrame(), inRight.getCvFrame(), timeStamp
         
         return None, None, 0.0

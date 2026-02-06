@@ -33,6 +33,7 @@ class UDP:
         try:
             json_bytes = orjson.dumps(payload, option=orjson.OPT_SERIALIZE_NUMPY)
             self.sock.sendto(json_bytes, (self.config.udp_ip, port))
+            print(json_bytes, flush=True)
         except Exception as e:
             print(f"UDP Error (Target {port}): {e}")
 

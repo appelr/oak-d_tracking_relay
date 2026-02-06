@@ -90,20 +90,18 @@ class HandTracker:
         handR = {}
 
         lResult = self.model.process(lRGB)
-        
         if lResult.multi_hand_landmarks:
             for lLandmarks, handedness in zip(lResult.multi_hand_landmarks, lResult.multi_handedness):
                 handCenter = lLandmarks.landmark[9]
                 handLabel = handedness.classification[0].label
-
                 # Swap hands for ego perspective
-                if handLabel is "right_hand":
+                if handLabel == "Right":
                     handL = {
                         "x": handCenter.x ,
                         "y": handCenter.y,
                         "z": 0.0
                     }
-                if handLabel is "left_hand":
+                if handLabel == "Left":
                     handR = {
                         "x": handCenter.x ,
                         "y": handCenter.y,

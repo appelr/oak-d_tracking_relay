@@ -45,7 +45,6 @@ def main():
 
                 if landmarksHandL:
                     handL= processingUtils.landmarkToPixelCoordinates(landmarksHandL["x"], landmarksHandL["y"])
-
                 if landmarksHandR:
                     handR = processingUtils.landmarkToPixelCoordinates(landmarksHandR["x"], landmarksHandR["y"])
 

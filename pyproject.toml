@@ -37,3 +37,4 @@ dependencies = [
 
 [project.scripts]
 start-tracking = "oakd_tracking_relay.Worker:main"
+start-config = "oakd_tracking_relay.setup:main"

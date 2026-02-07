@@ -14,8 +14,36 @@ def main():
     mp_drawing = mp.solutions.drawing_utils
     mp_drawing_styles = mp.solutions.drawing_styles
     
+
+    # --- SETUP SCHIEBEREGLER ---
+    cv2.namedWindow("Oak-D Live Stream")
+
+    def nothing(x): 
+        pass
+    
+    cv2.createTrackbar("ISO", "Oak-D Live Stream", config.iso, 1600, nothing)
+    cv2.setTrackbarMin("ISO", "Oak-D Live Stream", 100)
+    cv2.setTrackbarMax("ISO", "Oak-D Live Stream", 600)
+
+    cv2.createTrackbar("Exposure", "Oak-D Live Stream", config.exposure_us, 33000, nothing)
+    cv2.setTrackbarMin("Exposure", "Oak-D Live Stream", 20)
+    cv2.setTrackbarMax("Exposure", "Oak-D Live Stream", 1000)
+    # ---------------------------
+
     with OakD(config) as camera:
         while True:
+                # 1. Werte von Trackbars abgreifen
+                new_iso = cv2.getTrackbarPos("ISO", "Oak-D Live Stream")
+                new_exp = cv2.getTrackbarPos("Exposure", "Oak-D Live Stream")
+                # 2. Prüfen, ob sich etwas geändert hat
+                if new_iso != config.iso or new_exp != config.exposure_us:
+                    config.iso = new_iso
+                    config.exposure_us = new_exp
+                    config.update_trigger = True 
+                    camera._updateSettings()
+                    config.update_trigger = False
+                    config.save()
+
                 frameL, frameR, _ = camera.get_frames()
 
                 if frameL is None or frameR is None:

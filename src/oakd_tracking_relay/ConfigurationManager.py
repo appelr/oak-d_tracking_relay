@@ -23,10 +23,11 @@ class Configuration:
     mp_min_detection: float = 0.4
     mp_min_tracking: float = 0.2
 
-    @classmethod
-    def save(cls, filename="config.json"):
-        config = cls()
-        data = asdict(config)
+    # Update Logic
+    update_trigger: bool = False
+
+    def save(self, filename="config.json"):
+        data = asdict(self)
             
         try:
             with open(filename, 'w') as f:

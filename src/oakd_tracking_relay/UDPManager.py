@@ -15,8 +15,8 @@ class UDP:
             head = {
                 "ts": timeStamp,
                 "head": {
-                    "irisL": irisL,
-                    "irisR": irisR
+                    "left_iris": irisL,
+                    "right_iris": irisR
                 }
             }
             self.sendInternal(head, self.config.udp_port_head)

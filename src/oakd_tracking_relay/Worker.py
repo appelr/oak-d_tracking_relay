@@ -26,13 +26,13 @@ def main():
                 frameL, frameR = processingUtils.rectifyStereoFrame(frameL, frameR)
 
                 # Process
-                stereoLandmarksIrisL, stereoLandmarksIrisR, landmarksHandL, landmarksHandR = engine.processStereoFrame(frameL, frameR)
+                stereoLandmarksIrisL, stereoLandmarksIrisR, stereoLandmarksHandL, stereoLandmarksHandR = engine.processStereoFrame(frameL, frameR)
 
                 # Initialization
                 irisL3D = {}
                 irisR3D = {}
-                handL = {}
-                handR = {}
+                handL3D = {}
+                handR3D = {}
 
                 if stereoLandmarksIrisL and stereoLandmarksIrisR:
                     # Normalized Landmarks to Pixel
@@ -43,12 +43,15 @@ def main():
                     irisL3D = processingUtils.triangulatePoints(irisL2D)
                     irisR3D = processingUtils.triangulatePoints(irisR2D)
 
-                if landmarksHandL:
-                    handL= processingUtils.landmarkToPixelCoordinates(landmarksHandL["x"], landmarksHandL["y"])
-                if landmarksHandR:
-                    handR = processingUtils.landmarkToPixelCoordinates(landmarksHandR["x"], landmarksHandR["y"])
+                if stereoLandmarksHandL:
+                    handL= processingUtils.stereoLandmarkToPixelCoordinates(stereoLandmarksHandL)
+                    handL3D = processingUtils.triangulatePoints(handL)
 
-                udpManager.send(irisL3D, irisR3D, handL, handR, timeStamp)
+                if stereoLandmarksHandR:
+                    handR = processingUtils.stereoLandmarkToPixelCoordinates(stereoLandmarksHandR)
+                    handR3D = processingUtils.triangulatePoints(handR)
+
+                udpManager.send(irisL3D, irisR3D, handL3D, handR3D, timeStamp)
 
     except Exception as e:
         print(f"Error in Worker: {e}", flush=True)

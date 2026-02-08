@@ -82,22 +82,13 @@ def main():
                 resultsR = model.process(rRGB)
 
                 if resultsL.multi_face_landmarks and resultsR.multi_face_landmarks:
-                    for face_landmarks in resultsL.multi_face_landmarks:
-                        mp_drawing.draw_landmarks(
-                            image=lRGB,
-                            landmark_list=face_landmarks,
-                            connections=mp.solutions.face_mesh.FACEMESH_TESSELATION,
-                            landmark_drawing_spec=None,
-                            connection_drawing_spec=mp_drawing_styles.get_default_face_mesh_tesselation_style()
-                        )
-                        # Zeichne die Konturen (Augen, Lippen, Gesichtsumriss)
-                        mp_drawing.draw_landmarks(
-                            image=lRGB,
-                            landmark_list=face_landmarks,
-                            connections=mp.solutions.face_mesh.FACEMESH_CONTOURS,
-                            landmark_drawing_spec=None,
-                            connection_drawing_spec=mp_drawing_styles.get_default_face_mesh_contours_style()
-                        )
+                    mp_drawing.draw_landmarks(
+                        image=lRGB,
+                        landmark_list=resultsL.multi_face_landmarks[0],
+                        connections=mp.solutions.face_mesh.FACEMESH_IRISES,
+                        landmark_drawing_spec=None,
+                        connection_drawing_spec=mp_drawing_styles.get_default_face_mesh_iris_connections_style()
+                    )
                 display_frame = cv2.cvtColor(lRGB, cv2.COLOR_RGB2BGR)
                 cv2.imshow("Oak-D Live Stream", display_frame)
 

@@ -3,6 +3,7 @@ import cv2
 import mediapipe as mp
 from oakd_tracking_relay.ConfigurationManager import Configuration
 from oakd_tracking_relay.CameraManager import OakD
+from oakd_tracking_relay.Utils import ProcessingUtils
 
 def main():
     config = Configuration.load("config.json")
@@ -21,24 +22,33 @@ def main():
     def nothing(x): 
         pass
     
-    cv2.createTrackbar("ISO", "Oak-D Live Stream", config.iso, 1600, nothing)
+    cv2.createTrackbar("ISO", "Oak-D Live Stream", config.iso, 200, nothing)
     cv2.setTrackbarMin("ISO", "Oak-D Live Stream", 100)
     cv2.setTrackbarMax("ISO", "Oak-D Live Stream", 600)
 
-    cv2.createTrackbar("Exposure", "Oak-D Live Stream", config.exposure_us, 33000, nothing)
-    cv2.setTrackbarMin("Exposure", "Oak-D Live Stream", 20)
-    cv2.setTrackbarMax("Exposure", "Oak-D Live Stream", 1000)
+    cv2.createTrackbar("Exposure", "Oak-D Live Stream", config.exposure_us, 300, nothing)
+    cv2.setTrackbarMin("Exposure", "Oak-D Live Stream", 100)
+    cv2.setTrackbarMax("Exposure", "Oak-D Live Stream", 800)
+
+    cv2.createTrackbar("IR Laser", "Oak-D Live Stream", config.ir_laser_intensity, 100, nothing)
+    cv2.setTrackbarMin("IR Laser", "Oak-D Live Stream", 0)
+    cv2.setTrackbarMax("IR Laser", "Oak-D Live Stream", 100)
     # ---------------------------
 
     with OakD(config) as camera:
+        utils = ProcessingUtils(camera=camera, config=config)
         while True:
+                
                 # 1. Werte von Trackbars abgreifen
                 new_iso = cv2.getTrackbarPos("ISO", "Oak-D Live Stream")
                 new_exp = cv2.getTrackbarPos("Exposure", "Oak-D Live Stream")
+                new_ir = cv2.getTrackbarPos("IR Laser", "Oak-D Live Stream")
+
                 # 2. Prüfen, ob sich etwas geändert hat
-                if new_iso != config.iso or new_exp != config.exposure_us:
+                if new_iso != config.iso or new_exp != config.exposure_us or new_ir != config.ir_laser_intensity:
                     config.iso = new_iso
                     config.exposure_us = new_exp
+                    config.ir_laser_intensity = new_ir
                     config.update_trigger = True 
                     camera._updateSettings()
                     config.update_trigger = False
@@ -51,6 +61,8 @@ def main():
                         print("Frame skipped")
                         continue
                 
+                frameL, frameR = utils.rectifyStereoFrame(frameL, frameR)
+
                 lRGB = cv2.cvtColor(frameL, cv2.COLOR_GRAY2RGB)
                 rRGB = cv2.cvtColor(frameR, cv2.COLOR_GRAY2RGB)
 

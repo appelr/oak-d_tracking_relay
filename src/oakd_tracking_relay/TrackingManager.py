@@ -27,8 +27,8 @@ class HeadTracker:
         self.model = mp.solutions.face_mesh.FaceMesh(
             max_num_faces=2, 
             refine_landmarks=True,
-            min_detection_confidence=config.mp_min_detection, 
-            min_tracking_confidence=config.mp_min_tracking)
+            min_detection_confidence=float(config.mp_min_detection_percent/100), 
+            min_tracking_confidence=float(config.mp_min_tracking_percent/100))
         
 
     def process(self, lRGB: np.ndarray, rRGB: np.ndarray) -> Tuple[Dict, Dict]:
@@ -81,8 +81,8 @@ class HandTracker:
         self.model = mp.solutions.hands.Hands(
             max_num_hands=2,
             model_complexity=0,
-            min_detection_confidence=config.mp_min_detection,
-            min_tracking_confidence=config.mp_min_tracking
+            min_detection_confidence=float(config.mp_min_detection_percent/100),
+            min_tracking_confidence=float(config.mp_min_tracking_percent/100)
         )
 
     def process(self, lRGB: np.ndarray, rRGB: np.ndarray) -> Tuple[Dict, Dict]:

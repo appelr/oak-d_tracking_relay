@@ -10,8 +10,8 @@ def main():
     model = mp.solutions.face_mesh.FaceMesh(
             max_num_faces=2, 
             refine_landmarks=True,
-            min_detection_confidence=config.mp_min_detection, 
-            min_tracking_confidence=config.mp_min_tracking)
+            min_detection_confidence=float(config.mp_min_detection_percent)/100, 
+            min_tracking_confidence=float(config.mp_min_tracking_percent/100))
     mp_drawing = mp.solutions.drawing_utils
     mp_drawing_styles = mp.solutions.drawing_styles
     
@@ -22,17 +22,25 @@ def main():
     def nothing(x): 
         pass
     
-    cv2.createTrackbar("ISO", "Oak-D Live Stream", config.iso, 200, nothing)
+    cv2.createTrackbar("ISO", "Oak-D Live Stream", config.iso, config.iso, nothing)
     cv2.setTrackbarMin("ISO", "Oak-D Live Stream", 100)
     cv2.setTrackbarMax("ISO", "Oak-D Live Stream", 600)
 
-    cv2.createTrackbar("Exposure", "Oak-D Live Stream", config.exposure_us, 300, nothing)
+    cv2.createTrackbar("Exposure", "Oak-D Live Stream", config.exposure_us, config.exposure_us, nothing)
     cv2.setTrackbarMin("Exposure", "Oak-D Live Stream", 100)
     cv2.setTrackbarMax("Exposure", "Oak-D Live Stream", 800)
 
-    cv2.createTrackbar("IR Laser", "Oak-D Live Stream", config.ir_laser_intensity, 100, nothing)
+    cv2.createTrackbar("IR Laser", "Oak-D Live Stream", config.ir_laser_intensity_percent, config.ir_laser_intensity_percent, nothing)
     cv2.setTrackbarMin("IR Laser", "Oak-D Live Stream", 0)
     cv2.setTrackbarMax("IR Laser", "Oak-D Live Stream", 100)
+
+    cv2.createTrackbar("Min. Detection", "Oak-D Live Stream", config.mp_min_detection_percent, config.mp_min_detection_percent, nothing)
+    cv2.setTrackbarMin("Min. Detection", "Oak-D Live Stream", 0)
+    cv2.setTrackbarMax("Min. Detection", "Oak-D Live Stream", 100)
+
+    cv2.createTrackbar("Min. Tracking", "Oak-D Live Stream", config.mp_min_tracking_percent, config.mp_min_tracking_percent, nothing)
+    cv2.setTrackbarMin("Min. Tracking", "Oak-D Live Stream", 0)
+    cv2.setTrackbarMax("Min. Tracking", "Oak-D Live Stream", 100)
     # ---------------------------
 
     with OakD(config) as camera:
@@ -43,12 +51,16 @@ def main():
                 new_iso = cv2.getTrackbarPos("ISO", "Oak-D Live Stream")
                 new_exp = cv2.getTrackbarPos("Exposure", "Oak-D Live Stream")
                 new_ir = cv2.getTrackbarPos("IR Laser", "Oak-D Live Stream")
+                new_det = cv2.getTrackbarPos("Min. Detection", "Oak-D Live Stream")
+                new_tra = cv2.getTrackbarPos("Min. Tracking", "Oak-D Live Stream")
 
                 # 2. Prüfen, ob sich etwas geändert hat
-                if new_iso != config.iso or new_exp != config.exposure_us or new_ir != config.ir_laser_intensity:
+                if new_iso != config.iso or new_exp != config.exposure_us or new_ir != config.ir_laser_intensity_percent or new_det != config.mp_min_detection_percent or new_tra != config.mp_min_tracking_percent:
                     config.iso = new_iso
                     config.exposure_us = new_exp
-                    config.ir_laser_intensity = new_ir
+                    config.ir_laser_intensity_percent = new_ir
+                    config.mp_min_detection_percent = new_det
+                    config.mp_min_tracking_percent = new_tra
                     config.update_trigger = True 
                     camera._updateSettings()
                     config.update_trigger = False

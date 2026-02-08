@@ -15,13 +15,13 @@ class Configuration:
     fps: int = 100
     exposure_us: int = 600
     iso: int = 200
-    ir_laser_intensity: int = 100
+    ir_laser_intensity_percent: int = 100
     resolutionWidth: int = 640
     resolutionHeight: int = 400
     
-    # Tracking Filter
-    mp_min_detection: float = 0.4
-    mp_min_tracking: float = 0.2
+    # Tracking
+    mp_min_detection_percent: int = 40
+    mp_min_tracking_percent: int = 20
 
     # Update Logic
     update_trigger: bool = False

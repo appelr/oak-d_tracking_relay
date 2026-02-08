@@ -16,7 +16,7 @@ class OakD:
         self.device = dai.Device(self.pipeline, maxUsbSpeed=dai.UsbSpeed.SUPER_PLUS)
         try:
             self.device.setIrLaserDotProjectorIntensity(0.0)
-            self.device.setIrFloodLightIntensity(float(self.config.ir_laser_intensity/100))
+            self.device.setIrFloodLightIntensity(float(self.config.ir_laser_intensity_percent/100))
         except: 
             pass
         
@@ -79,7 +79,7 @@ class OakD:
         
         try:
             self.device.setIrLaserDotProjectorIntensity(0.0)
-            self.device.setIrFloodLightIntensity(float(self.config.ir_laser_intensity)/100)
+            self.device.setIrFloodLightIntensity(float(self.config.ir_laser_intensity_percent)/100)
         except: 
             pass
 

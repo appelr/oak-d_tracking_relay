@@ -84,14 +84,6 @@ class ProcessingUtils:
                 }
             }
 
-    def landmarkToPixelCoordinates(self, landmarkX: float, landmarkY: float) -> Dict:
-        x, y = self._landmarkToPixelCoordinates(landmarkX, landmarkY)
-
-        return {
-            "x": x,
-            "y": y
-        } 
-     
     def _landmarkToPixelCoordinates(self, landmarkX: float, landmarkY: float) -> Tuple[float, float]:
         x = float(landmarkX * self.config.resolutionWidth)
         y = float(landmarkY * self.config.resolutionHeight)
@@ -113,3 +105,16 @@ class ProcessingUtils:
             "y": (coordinates["left_cam"]["y"]  - self.cy) * z / self.fy,
             "z": z
         }
+    
+    def createLandmakrDict(self, lx: float, ly: float, rx: float, ry: float) -> Dict:
+        return {
+            "left_cam": {
+                "x": lx,
+                "y": ly
+            },
+            "right_cam": {
+                "x": rx,
+                "y": ry
+            }
+        }
+    

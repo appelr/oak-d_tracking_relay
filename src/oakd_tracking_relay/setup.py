@@ -14,8 +14,12 @@ def main():
             min_detection_confidence=float(config.mp_min_detection_percent)/100, 
             min_tracking_confidence=float(config.mp_min_tracking_percent/100))
 
-    updateFrame = 0
-    updateInterval = 15
+    detectionBuffer = []
+    maxJump = 20
+    maxDispDelta = 3
+    confidenceInit = 5
+    confidenceMin = 0
+    recheckInterval = 20
 
     opticalFlowParams = dict(winSize=(21, 21), maxLevel=3,
                      criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 20, 0.03))
@@ -50,6 +54,8 @@ def main():
         utils = ProcessingUtils(camera=camera, config=config)
         prevFrameL, prevFrameR = None, None
         stereoCoordinates = None
+        trackingConfidence = 0
+        frameCounter = 0
 
         while True:
             # Config Änderungen
@@ -79,8 +85,9 @@ def main():
                 continue
             
             frameL, frameR = utils.rectifyStereoFrame(frameL, frameR)
+            displayFrame = cv2.cvtColor(frameL, cv2.COLOR_GRAY2BGR)
 
-            if updateFrame % updateInterval == 0 or stereoCoordinates is None:
+            if stereoCoordinates is None:
                 # Mediapipe braucht RGB
                 lRGB = cv2.cvtColor(frameL, cv2.COLOR_GRAY2RGB)
                 rRGB = cv2.cvtColor(frameR, cv2.COLOR_GRAY2RGB)
@@ -92,15 +99,37 @@ def main():
                     camLIrisL = resultsL.multi_face_landmarks[0].landmark[468]
                     camRIrisL = resultsR.multi_face_landmarks[0].landmark[468]
 
-                    landmarksIrisL = utils.createLandmakrDict(camLIrisL.x, camLIrisL.y, camRIrisL.x, camRIrisL.y)
-                    stereoCoordinates = utils.stereoLandmarkToPixelCoordinates(landmarksIrisL)
-                    
-                    prevFrameL, prevFrameR = frameL.copy(), frameR.copy()
+                    landmarksIrisL = utils.createLandmakrDict(
+                        camLIrisL.x, 
+                        camLIrisL.y, 
+                        camRIrisL.x, 
+                        camRIrisL.y
+                    )
+                    detectionBuffer.append(utils.stereoLandmarkToPixelCoordinates(landmarksIrisL))
+
+                    if len(detectionBuffer) >= 3:
+                        p1 = detectionBuffer[0]["left_cam"]
+                        p3 = detectionBuffer[-1]["left_cam"]
+                        
+                        # Distanz berechnen (hat sich das Auge bewegt?)
+                        dist = np.sqrt((p1["x"] - p3["x"])**2 + (p1["y"] - p3["y"])**2)
+                        
+                        # Wenn stabil (< 3 Pixel Bewegung) -> START TRACKING
+                        if dist < 3.0:
+                            stereoCoordinates = detectionBuffer[-1]
+                            prevFrameL, prevFrameR = frameL.copy(), frameR.copy()
+                            trackingConfidence = confidenceInit
+                            detectionBuffer = []
+                        else:
+                            detectionBuffer.pop(0)
+                else:
+                    detectionBuffer = []
             else:
                 pointsL = np.array(
                     [[stereoCoordinates["left_cam"]["x"], 
                       stereoCoordinates["left_cam"]["y"]]], 
                       dtype=np.float32).reshape(-1, 1, 2)
+                
                 pointsR = np.array(
                     [[stereoCoordinates["right_cam"]["x"], 
                       stereoCoordinates["right_cam"]["y"]]], 
@@ -111,7 +140,7 @@ def main():
                     frameL, 
                     pointsL, 
                     None, 
-                    **opticalFlowParams)#
+                    **opticalFlowParams)
                 
                 nextPointsR, statusR, _ = cv2.calcOpticalFlowPyrLK(
                     prevFrameR, 
@@ -121,17 +150,68 @@ def main():
                     **opticalFlowParams)
 
                 if statusL[0][0] == 1 and statusR[0][0] == 1:
+                    nextLx, nextLy = nextPointsL[0][0]
+                    nextRx, nextRy = nextPointsR[0][0]
+
+                    distX = nextLx - stereoCoordinates["left_cam"]["x"]
+                    distY = nextLy - stereoCoordinates["left_cam"]["y"]
+
+                    prevDisp = (stereoCoordinates["left_cam"]["x"] - stereoCoordinates["right_cam"]["x"])
+                    currentDisp = nextLx - nextRx
+
+                    if np.hypot(distX, distY) > maxJump or abs(currentDisp - prevDisp) > maxDispDelta:
+                        trackingConfidence -= 1
+
+                        if trackingConfidence <= confidenceMin:
+                            stereoCoordinates = None
+                            detectionBuffer = []
+
+                        continue
+
                     stereoCoordinates = utils.createLandmakrDict(
-                        nextPointsL[0][0][0], 
-                        nextPointsL[0][0][1], 
-                        nextPointsR[0][0][0], 
-                        nextPointsR[0][0][1])
+                        nextLx, 
+                        nextLy, 
+                        nextRx, 
+                        nextRy
+                    )
+                    
                     prevFrameL, prevFrameR = frameL.copy(), frameR.copy()
+
+                    trackingConfidence = min(trackingConfidence + 1, confidenceInit)
                 else:
-                    stereoCoordinates = None
+                    trackingConfidence -= 2
+                    if trackingConfidence <= confidenceMin:
+                        stereoCoordinates = None
+                        detectionBuffer = []
+
+            frameCounter += 1
+
+            if stereoCoordinates is not None and frameCounter % recheckInterval == 0:
+                # Mediapipe braucht RGB
+                lRGB = cv2.cvtColor(frameL, cv2.COLOR_GRAY2RGB)
+                rRGB = cv2.cvtColor(frameR, cv2.COLOR_GRAY2RGB)
+                # Verarbeitung Mediapipe
+                resultsL = model.process(lRGB)
+                resultsR = model.process(rRGB)
+
+                if resultsL.multi_face_landmarks and resultsR.multi_face_landmarks:
+                    camLIrisL = resultsL.multi_face_landmarks[0].landmark[468]
+                    camRIrisL = resultsR.multi_face_landmarks[0].landmark[468]
+
+                    mpStereo = utils.stereoLandmarkToPixelCoordinates(
+                        utils.createLandmakrDict(camLIrisL.x, camLIrisL.y, camRIrisL.x, camRIrisL.y)
+                    ) 
+                    dist = np.hypot(
+                        mpStereo["left_cam"]["x"] - stereoCoordinates["left_cam"]["x"],
+                        mpStereo["left_cam"]["y"] - stereoCoordinates["left_cam"]["y"]
+                    )
+
+                    if dist > 6:
+                        stereoCoordinates = mpStereo
+                        prevFrameL, prevFrameR = frameL.copy(), frameR.copy()
+                        trackingConfidence = confidenceInit
 
             if stereoCoordinates is not None:
-                displayFrame = cv2.cvtColor(frameL, cv2.COLOR_GRAY2BGR)
                 iris3D = utils.triangulatePoints(stereoCoordinates)
                 pointX, pointY = int(stereoCoordinates["left_cam"]["x"]), int(stereoCoordinates["left_cam"]["y"])
                 cv2.circle(displayFrame, (pointX, pointY), 5, (0, 255, 0), -1)
@@ -140,15 +220,11 @@ def main():
                 cv2.imshow("Preview", displayFrame)
             else:
                 cv2.imshow("Preview", frameL)
-            updateFrame += 1
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
         cv2.destroyAllWindows()
-
-                
-
 
 if __name__ == "__main__":
     main()

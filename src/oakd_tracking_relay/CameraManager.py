@@ -1,6 +1,6 @@
 import depthai as dai
-import numpy as np
-
+import time
+from datetime import timedelta
 from .ConfigurationManager import Configuration
 
 class OakD:
@@ -12,6 +12,7 @@ class OakD:
         # self.qRight = None
         self.qSync = None
         self.qControl = None
+        self.CameraStartupTimeMs = None
 
     def __enter__(self):
         self.device = dai.Device(self.pipeline, maxUsbSpeed=dai.UsbSpeed.SUPER_PLUS)
@@ -21,11 +22,10 @@ class OakD:
         except: 
             pass
         
-        # self.qLeft = self.device.getOutputQueue(name="left", maxSize=1, blocking=False)
-        # self.qRight = self.device.getOutputQueue(name="right", maxSize=1, blocking=False)
+        self.CameraStartupTimeMs = dai.Clock.now().total_seconds() * 1000.0
         self.qSync = self.device.getOutputQueue(name="sync_out", maxSize=1, blocking=False)
         self.qControl = self.device.getInputQueue(name="control")
-        
+        self.device.setTimesync(timedelta(seconds=2.5), 20, True)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -102,8 +102,8 @@ class OakD:
             inLeft = msgGroup["left"]
             inRight = msgGroup["right"]
 
-            timeStamp = inLeft.getTimestamp().total_seconds() * 1000
+            timeSinceProgramStartMs = inLeft.getTimestamp().total_seconds() * 1000.0 - self.CameraStartupTimeMs
             
-            return inLeft.getCvFrame(), inRight.getCvFrame(), timeStamp
+            return inLeft.getCvFrame(), inRight.getCvFrame(), timeSinceProgramStartMs
         
         return None, None, 0.0

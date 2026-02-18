@@ -33,6 +33,7 @@ dependencies = [
     "nicegui",
     "numpy",
     "orjson",
+    "matplotlib",
 ]
 
 [project.scripts]

@@ -8,8 +8,9 @@ class OakD:
         self.config = config
         self.pipeline = self._createPipeline()
         self.device = None
-        self.qLeft = None
-        self.qRight = None
+        # self.qLeft = None
+        # self.qRight = None
+        self.qSync = None
         self.qControl = None
 
     def __enter__(self):
@@ -20,8 +21,9 @@ class OakD:
         except: 
             pass
         
-        self.qLeft = self.device.getOutputQueue(name="left", maxSize=1, blocking=False)
-        self.qRight = self.device.getOutputQueue(name="right", maxSize=1, blocking=False)
+        # self.qLeft = self.device.getOutputQueue(name="left", maxSize=1, blocking=False)
+        # self.qRight = self.device.getOutputQueue(name="right", maxSize=1, blocking=False)
+        self.qSync = self.device.getOutputQueue(name="sync_out", maxSize=1, blocking=False)
         self.qControl = self.device.getInputQueue(name="control")
         
         return self
@@ -54,16 +56,23 @@ class OakD:
         controlIn.out.link(monoLeft.inputControl)
         controlIn.out.link(monoRight.inputControl)
 
-        # Outputs
-        xoutLeft = pipeline.create(dai.node.XLinkOut)
-        xoutLeft.setStreamName("left")
-        
-        xoutRight = pipeline.create(dai.node.XLinkOut)
-        xoutRight.setStreamName("right")
+        syncNode = pipeline.create(dai.node.Sync)
 
-        monoLeft.out.link(xoutLeft.input)
-        monoRight.out.link(xoutRight.input)
+        # # Outputs
+        # xoutLeft = pipeline.create(dai.node.XLinkOut)
+        # xoutLeft.setStreamName("left")
         
+        # xoutRight = pipeline.create(dai.node.XLinkOut)
+        # xoutRight.setStreamName("right")
+
+        monoLeft.out.link(syncNode.inputs["left"])
+        monoRight.out.link(syncNode.inputs["right"])
+
+        xoutSync = pipeline.create(dai.node.XLinkOut)
+        xoutSync.setStreamName("sync_out")
+        
+        syncNode.out.link(xoutSync.input)   
+
         return pipeline
 
     def _updateSettings(self):
@@ -84,17 +93,17 @@ class OakD:
             pass
 
     def get_frames(self):
-        inLeft = self.qLeft.tryGet()
-        inRight = self.qRight.tryGet()
+        msgGroup = self.qSync.tryGet()
 
-        while self.qLeft.has(): 
-            inLeft = self.qLeft.get()
+        while self.qSync.has(): 
+            msgGroup = self.qSync.get()
 
-        while self.qRight.has(): 
-            inRight = self.qRight.get()
+        if msgGroup is not None:
+            inLeft = msgGroup["left"]
+            inRight = msgGroup["right"]
 
-        if inLeft is not None and inRight is not None:
             timeStamp = inLeft.getTimestamp().total_seconds() * 1000
+            
             return inLeft.getCvFrame(), inRight.getCvFrame(), timeStamp
         
         return None, None, 0.0

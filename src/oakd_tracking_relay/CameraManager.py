@@ -12,7 +12,7 @@ class OakD:
         # self.qRight = None
         self.qSync = None
         self.qControl = None
-        self.CameraStartupTimeMs = None
+        self.referenceTime = None
 
     def __enter__(self):
         self.device = dai.Device(self.pipeline, maxUsbSpeed=dai.UsbSpeed.SUPER_PLUS)
@@ -22,7 +22,8 @@ class OakD:
         except: 
             pass
         
-        self.CameraStartupTimeMs = dai.Clock.now().total_seconds() * 1000.0
+        # Epoche bis PC-Start
+        self.referenceTime = (time.time() - dai.Clock.now().total_seconds()) * 1000.0
         self.qSync = self.device.getOutputQueue(name="sync_out", maxSize=1, blocking=False)
         self.qControl = self.device.getInputQueue(name="control")
         self.device.setTimesync(timedelta(seconds=2.5), 20, True)
@@ -101,9 +102,10 @@ class OakD:
         if msgGroup is not None:
             inLeft = msgGroup["left"]
             inRight = msgGroup["right"]
-
-            timeSinceProgramStartMs = inLeft.getTimestamp().total_seconds() * 1000.0 - self.CameraStartupTimeMs
             
-            return inLeft.getCvFrame(), inRight.getCvFrame(), timeSinceProgramStartMs
+            timeSinceEpoch = inLeft.getTimestamp().total_seconds() * 1000.0 + self.referenceTime
+            print(timeSinceEpoch)
+            
+            return inLeft.getCvFrame(), inRight.getCvFrame(), timeSinceEpoch
         
         return None, None, 0.0

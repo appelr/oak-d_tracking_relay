@@ -104,7 +104,6 @@ class OakD:
             inRight = msgGroup["right"]
             
             timeSinceEpoch = inLeft.getTimestamp().total_seconds() * 1000.0 + self.referenceTime
-            print(timeSinceEpoch)
             
             return inLeft.getCvFrame(), inRight.getCvFrame(), timeSinceEpoch
         

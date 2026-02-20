@@ -83,6 +83,10 @@ def main():
                 time.sleep(0.002)
                 print("Frame skipped")
                 continue
+
+            # frameL = cv2.rotate(frameL, cv2.ROTATE_180)
+            # frameR = cv2.rotate(frameR, cv2.ROTATE_180)
+            # frameL, frameR = frameR, frameL
             
             frameL, frameR = utils.rectifyStereoFrame(frameL, frameR)
             displayFrame = cv2.cvtColor(frameL, cv2.COLOR_GRAY2BGR)

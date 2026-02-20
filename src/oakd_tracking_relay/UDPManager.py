@@ -4,30 +4,48 @@ import orjson
 from typing import Dict
 
 from .ConfigurationManager import Configuration
+from .TrackingDTO import *
 
 class UDP:
     def __init__(self, config: Configuration):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.config = config
     
-    def send(self, irisL: Dict, irisR: Dict, handL: Dict, handR: Dict, timeStamp: float):
-        if irisL and irisR: 
+    def send(self, irisL: Point3D, irisR: Point3D, handL: Point3D, handR: Point3D, timeStamp: float):
+        if irisL.valid() and irisR.valid(): 
             head = {
                 "ts": timeStamp,
                 "head": {
-                    "left_iris": irisL,
-                    "right_iris": irisR
+                    "left_iris": {
+                        "x": irisL.x,
+                        "y": irisL.y,
+                        "z": irisL.z
+                    },
+                    "right_iris": {
+                        "x": irisR.x,
+                        "y": irisR.y,
+                        "z": irisR.z
+                    }
                 }
             }
             self.sendInternal(head, self.config.udp_port_head)
 
-        if handL or handR:
+        if handL.valid() or handR.valid():
             hands = {"ts": timeStamp, "hands": {}}
-            if handL:
-                hands["hands"]["left_hand"] = handL
+
+            if handL.valid():
+                hands["hands"]["left_hand"] = {
+                    "x": handL.x,
+                    "y": handL.y,
+                    "z": handL.z
+                }
                 
-            if handR:
-                hands["hands"]["right_hand"] = handR
+            if handR.valid():
+                hands["hands"]["right_hand"] = {
+                    "x": handR.x,
+                    "y": handR.y,
+                    "z": handR.z
+                }
 
             self.sendInternal(hands, self.config.udp_port_hands)
 

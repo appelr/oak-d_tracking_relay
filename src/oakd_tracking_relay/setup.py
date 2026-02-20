@@ -5,6 +5,7 @@ import numpy as np
 from oakd_tracking_relay.ConfigurationManager import Configuration
 from oakd_tracking_relay.CameraManager import OakD
 from oakd_tracking_relay.Utils import ProcessingUtils
+from oakd_tracking_relay.TrackingDTO import *
 
 def main():
     config = Configuration.load("config.json")
@@ -53,7 +54,7 @@ def main():
     with OakD(config) as camera:
         utils = ProcessingUtils(camera=camera, config=config)
         prevFrameL, prevFrameR = None, None
-        stereoCoordinates = None
+        stereoCoordinates = StereoPoint()
         trackingConfidence = 0
         frameCounter = 0
 
@@ -91,7 +92,7 @@ def main():
             frameL, frameR = utils.rectifyStereoFrame(frameL, frameR)
             displayFrame = cv2.cvtColor(frameL, cv2.COLOR_GRAY2BGR)
 
-            if stereoCoordinates is None:
+            if not stereoCoordinates.valid():
                 # Mediapipe braucht RGB
                 lRGB = cv2.cvtColor(frameL, cv2.COLOR_GRAY2RGB)
                 rRGB = cv2.cvtColor(frameR, cv2.COLOR_GRAY2RGB)
@@ -103,20 +104,15 @@ def main():
                     camLIrisL = resultsL.multi_face_landmarks[0].landmark[473]
                     camRIrisL = resultsR.multi_face_landmarks[0].landmark[473]
 
-                    landmarksIrisL = utils.createLandmakrDict(
-                        camLIrisL.x, 
-                        camLIrisL.y, 
-                        camRIrisL.x, 
-                        camRIrisL.y
-                    )
-                    detectionBuffer.append(utils.stereoLandmarkToPixelCoordinates(landmarksIrisL))
+                    irisL = StereoPoint(Point2D(camLIrisL.x, camLIrisL.y), Point2D(camRIrisL.x, camRIrisL.y))
+                    detectionBuffer.append(utils.stereoLandmarkToPixelCoordinates(irisL))
 
                     if len(detectionBuffer) >= 3:
-                        p1 = detectionBuffer[0]["left_cam"]
-                        p3 = detectionBuffer[-1]["left_cam"]
+                        p1 = detectionBuffer[0].left
+                        p3 = detectionBuffer[-1].left
                         
                         # Distanz berechnen (hat sich das Auge bewegt?)
-                        dist = np.sqrt((p1["x"] - p3["x"])**2 + (p1["y"] - p3["y"])**2)
+                        dist = np.sqrt((p1.x - p3.x)**2 + (p1.y - p3.y)**2)
                         
                         # Wenn stabil (< 3 Pixel Bewegung) -> START TRACKING
                         if dist < 3.0:
@@ -129,15 +125,8 @@ def main():
                 else:
                     detectionBuffer = []
             else:
-                pointsL = np.array(
-                    [[stereoCoordinates["left_cam"]["x"], 
-                      stereoCoordinates["left_cam"]["y"]]], 
-                      dtype=np.float32).reshape(-1, 1, 2)
-                
-                pointsR = np.array(
-                    [[stereoCoordinates["right_cam"]["x"], 
-                      stereoCoordinates["right_cam"]["y"]]], 
-                      dtype=np.float32).reshape(-1, 1, 2)
+                pointsL = stereoCoordinates.left.as_np().reshape(-1, 1, 2)
+                pointsR = stereoCoordinates.right.as_np().reshape(-1, 1, 2)
 
                 nextPointsL, statusL, _ = cv2.calcOpticalFlowPyrLK(
                     prevFrameL, 
@@ -157,27 +146,22 @@ def main():
                     nextLx, nextLy = nextPointsL[0][0]
                     nextRx, nextRy = nextPointsR[0][0]
 
-                    distX = nextLx - stereoCoordinates["left_cam"]["x"]
-                    distY = nextLy - stereoCoordinates["left_cam"]["y"]
+                    distX = nextLx - stereoCoordinates.left.x
+                    distY = nextLy - stereoCoordinates.left.y
 
-                    prevDisp = (stereoCoordinates["left_cam"]["x"] - stereoCoordinates["right_cam"]["x"])
+                    prevDisp = (stereoCoordinates.left.x - stereoCoordinates.right.x)
                     currentDisp = nextLx - nextRx
 
                     if np.hypot(distX, distY) > maxJump or abs(currentDisp - prevDisp) > maxDispDelta:
                         trackingConfidence -= 1
 
                         if trackingConfidence <= confidenceMin:
-                            stereoCoordinates = None
+                            stereoCoordinates = StereoPoint()
                             detectionBuffer = []
 
                         continue
-
-                    stereoCoordinates = utils.createLandmakrDict(
-                        nextLx, 
-                        nextLy, 
-                        nextRx, 
-                        nextRy
-                    )
+                    
+                    stereoCoordinates = StereoPoint(Point2D(nextLx, nextLy), Point2D(nextRx, nextRy))
                     
                     prevFrameL, prevFrameR = frameL.copy(), frameR.copy()
 
@@ -185,12 +169,12 @@ def main():
                 else:
                     trackingConfidence -= 2
                     if trackingConfidence <= confidenceMin:
-                        stereoCoordinates = None
+                        stereoCoordinates = StereoPoint()
                         detectionBuffer = []
 
             frameCounter += 1
 
-            if stereoCoordinates is not None and frameCounter % recheckInterval == 0:
+            if stereoCoordinates.valid() and frameCounter % recheckInterval == 0:
                 # Mediapipe braucht RGB
                 lRGB = cv2.cvtColor(frameL, cv2.COLOR_GRAY2RGB)
                 rRGB = cv2.cvtColor(frameR, cv2.COLOR_GRAY2RGB)
@@ -202,26 +186,25 @@ def main():
                     camLIrisL = resultsL.multi_face_landmarks[0].landmark[473]
                     camRIrisL = resultsR.multi_face_landmarks[0].landmark[473]
 
-                    mpStereo = utils.stereoLandmarkToPixelCoordinates(
-                        utils.createLandmakrDict(camLIrisL.x, camLIrisL.y, camRIrisL.x, camRIrisL.y)
-                    ) 
+                    stereoPoint = utils.stereoLandmarkToPixelCoordinates(StereoPoint(Point2D(camLIrisL.x, camLIrisL.y), Point2D(camRIrisL.x, camRIrisL.y)))
+                   
                     dist = np.hypot(
-                        mpStereo["left_cam"]["x"] - stereoCoordinates["left_cam"]["x"],
-                        mpStereo["left_cam"]["y"] - stereoCoordinates["left_cam"]["y"]
+                        stereoPoint.left.x - stereoCoordinates.left.x,
+                        stereoPoint.left.y - stereoCoordinates.left.y
                     )
 
                     if dist > 6:
-                        stereoCoordinates = mpStereo
+                        stereoCoordinates = stereoPoint
                         prevFrameL, prevFrameR = frameL.copy(), frameR.copy()
                         trackingConfidence = confidenceInit
 
-            if stereoCoordinates is not None:
+            if stereoCoordinates.valid():
                 # iris3D = utils.triangulatePoints(stereoCoordinates)
                 iris3D = utils.triangulatePoints_CV(stereoCoordinates)
 
-                pointX, pointY = int(stereoCoordinates["left_cam"]["x"]), int(stereoCoordinates["left_cam"]["y"])
+                pointX, pointY = int(stereoCoordinates.left.x), int(stereoCoordinates.left.y)
                 cv2.circle(displayFrame, (pointX, pointY), 5, (0, 255, 0), -1)
-                cv2.putText(displayFrame, f"X:{iris3D['x']:.0f} Y:{iris3D['y']:.0f} Z:{iris3D['z']:.0f}mm",
+                cv2.putText(displayFrame, f"X:{iris3D.x:.0f} Y:{iris3D.y:.0f} Z:{iris3D.z:.0f}mm",
                             (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
                 cv2.imshow("Preview", displayFrame)
             else:

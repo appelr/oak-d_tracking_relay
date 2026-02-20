@@ -5,6 +5,7 @@ from .TrackingManager import TrackingEngine
 from .UDPManager import UDP
 from .CameraManager import OakD
 from .Utils import ProcessingUtils
+from .TrackingDTO import Point3D
 
 def main():
     config = Configuration.load("config.json")
@@ -30,29 +31,29 @@ def main():
                 frameL, frameR = processingUtils.rectifyStereoFrame(frameL, frameR)
 
                 # Process
-                stereoLandmarksIrisL, stereoLandmarksIrisR, stereoLandmarksHandL, stereoLandmarksHandR = engine.processStereoFrame(frameL, frameR)
+                stereoPointsIrisL, stereoPointsIrisR, stereoPointsHandL, stereoPointsHandR = engine.processStereoFrame(frameL, frameR)
 
                 # Initialization
-                irisL3D = {}
-                irisR3D = {}
-                handL3D = {}
-                handR3D = {}
+                irisL3D = Point3D()
+                irisR3D = Point3D()
+                handL3D = Point3D()
+                handR3D = Point3D()
 
-                if stereoLandmarksIrisL and stereoLandmarksIrisR:
+                if stereoPointsIrisL.valid() and stereoPointsIrisR.valid():
                     # Normalized Landmarks to Pixel
-                    irisL2D = processingUtils.stereoLandmarkToPixelCoordinates(stereoLandmarksIrisL)
-                    irisR2D = processingUtils.stereoLandmarkToPixelCoordinates(stereoLandmarksIrisR)            
+                    irisL2D = processingUtils.stereoLandmarkToPixelCoordinates(stereoPointsIrisL)
+                    irisR2D = processingUtils.stereoLandmarkToPixelCoordinates(stereoPointsIrisR)            
 
                     # Triangulate to 3D coordinates
                     irisL3D = processingUtils.triangulatePoints_CV(irisL2D)
                     irisR3D = processingUtils.triangulatePoints_CV(irisR2D)
 
-                if stereoLandmarksHandL:
-                    handL= processingUtils.stereoLandmarkToPixelCoordinates(stereoLandmarksHandL)
+                if stereoPointsHandL.valid():
+                    handL= processingUtils.stereoLandmarkToPixelCoordinates(stereoPointsHandL)
                     handL3D = processingUtils.triangulatePoints_CV(handL)
 
-                if stereoLandmarksHandR:
-                    handR = processingUtils.stereoLandmarkToPixelCoordinates(stereoLandmarksHandR)
+                if stereoPointsHandR.valid():
+                    handR = processingUtils.stereoLandmarkToPixelCoordinates(stereoPointsHandR)
                     handR3D = processingUtils.triangulatePoints_CV(handR)
 
                 udpManager.send(irisL3D, irisR3D, handL3D, handR3D, timeStamp)

@@ -5,6 +5,7 @@ import mediapipe as mp
 from typing import Dict, Tuple, Optional
 
 from .ConfigurationManager import Configuration
+from .TrackingDTO import *
 
 class TrackingEngine:
     def __init__(self, config: Configuration):
@@ -12,7 +13,7 @@ class TrackingEngine:
         self.headTracker = HeadTracker(config)
         self.handTracker = HandTracker(config)
 
-    def processStereoFrame(self, frameL: np.ndarray, frameR: np.ndarray) -> Tuple[Dict, Dict, Dict, Dict]:
+    def processStereoFrame(self, frameL: np.ndarray, frameR: np.ndarray) -> Tuple[StereoPoint, StereoPoint, StereoPoint, StereoPoint]:
         lRGB = cv2.cvtColor(frameL, cv2.COLOR_GRAY2RGB)
         rRGB = cv2.cvtColor(frameR, cv2.COLOR_GRAY2RGB)
         
@@ -31,9 +32,9 @@ class HeadTracker:
             min_tracking_confidence=float(config.mp_min_tracking_percent/100))
         
 
-    def process(self, lRGB: np.ndarray, rRGB: np.ndarray) -> Tuple[Dict, Dict]:
-        irisL = {}
-        irisR = {}
+    def process(self, lRGB: np.ndarray, rRGB: np.ndarray) -> Tuple[StereoPoint, StereoPoint]:
+        irisL = StereoPoint()
+        irisR = StereoPoint()
 
         # Execute model processing
         lResult = self.model.process(lRGB)
@@ -51,28 +52,9 @@ class HeadTracker:
             lLandmarksIrisR = lLandmarks[473]
             rLandmarksIrisR = rLandmarks[473]
 
-            irisL = {
-                "left_cam":  {
-                    "x": lLandmarksIrisL.x,
-                    "y": lLandmarksIrisL.y
-                },
-                "right_cam": {
-                    "x": rLandmarksIrisL.x,
-                    "y": rLandmarksIrisL.y
-                }
-            }
+            irisL = StereoPoint(Point2D(lLandmarksIrisL.x, lLandmarksIrisL.y), Point2D(rLandmarksIrisL.x, rLandmarksIrisL.y))
+            irisR = StereoPoint(Point2D(lLandmarksIrisR.x, lLandmarksIrisR.y), Point2D(rLandmarksIrisR.x, rLandmarksIrisR.y))
             
-            irisR = {
-                "left_cam":  {
-                    "x": lLandmarksIrisR.x,
-                    "y": lLandmarksIrisR.y
-                },
-                "right_cam": {
-                    "x": rLandmarksIrisR.x,
-                    "y": rLandmarksIrisR.y
-                }
-            }
-
         return irisL, irisR
 
 class HandTracker:
@@ -85,9 +67,9 @@ class HandTracker:
             min_tracking_confidence=float(config.mp_min_tracking_percent/100)
         )
 
-    def process(self, lRGB: np.ndarray, rRGB: np.ndarray) -> Tuple[Dict, Dict]:
-        handL = {}
-        handR = {}
+    def process(self, lRGB: np.ndarray, rRGB: np.ndarray) -> Tuple[StereoPoint, StereoPoint]:
+        handL = StereoPoint()
+        handR = StereoPoint()
 
         lResult = self.model.process(lRGB)
         rResult = self.model.process(rRGB)
@@ -108,26 +90,8 @@ class HandTracker:
 
                     # Swap hands for ego perspective
                     if handLabel == "Right":
-                        handL = {
-                            "left_cam": {
-                                "x": handCenterCamL.x ,
-                                "y": handCenterCamL.y
-                            },
-                            "right_cam": {
-                                "x": handCenterCamR.x,
-                                "y": handCenterCamR.y
-                            }
-                        }
+                        handL = StereoPoint(Point2D(handCenterCamL.x, handCenterCamL.y), Point2D(handCenterCamR.x, handCenterCamR.y))
                     if handLabel == "Left":
-                        handR = {
-                            "left_cam": {
-                                "x": handCenterCamL.x ,
-                                "y": handCenterCamL.y
-                            },
-                            "right_cam": {
-                                "x": handCenterCamR.x,
-                                "y": handCenterCamR.y
-                            }
-                        }
+                        handR = StereoPoint(Point2D(handCenterCamL.x, handCenterCamL.y), Point2D(handCenterCamR.x, handCenterCamR.y))
         
         return handL, handR

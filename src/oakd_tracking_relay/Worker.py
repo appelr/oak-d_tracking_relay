@@ -40,16 +40,16 @@ def main():
                     irisR2D = processingUtils.stereoLandmarkToPixelCoordinates(stereoLandmarksIrisR)            
 
                     # Triangulate to 3D coordinates
-                    irisL3D = processingUtils.triangulatePoints(irisL2D)
-                    irisR3D = processingUtils.triangulatePoints(irisR2D)
+                    irisL3D = processingUtils.triangulatePoints_CV(irisL2D)
+                    irisR3D = processingUtils.triangulatePoints_CV(irisR2D)
 
                 if stereoLandmarksHandL:
                     handL= processingUtils.stereoLandmarkToPixelCoordinates(stereoLandmarksHandL)
-                    handL3D = processingUtils.triangulatePoints(handL)
+                    handL3D = processingUtils.triangulatePoints_CV(handL)
 
                 if stereoLandmarksHandR:
                     handR = processingUtils.stereoLandmarkToPixelCoordinates(stereoLandmarksHandR)
-                    handR3D = processingUtils.triangulatePoints(handR)
+                    handR3D = processingUtils.triangulatePoints_CV(handR)
 
                 udpManager.send(irisL3D, irisR3D, handL3D, handR3D, timeStamp)
 

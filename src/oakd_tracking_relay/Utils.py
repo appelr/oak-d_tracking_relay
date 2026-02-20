@@ -96,15 +96,15 @@ class ProcessingUtils:
         
         return rectL, rectR
     
-    def triangulatePoints(self, coordinates: Dict) -> Dict:
-        disparity = coordinates["left_cam"]["x"] - coordinates["right_cam"]["x"]
-        z = self.fx * self.baseline / disparity
+    # def triangulatePoints(self, coordinates: Dict) -> Dict:
+    #     disparity = coordinates["left_cam"]["x"] - coordinates["right_cam"]["x"]
+    #     z = self.fx * self.baseline / disparity
 
-        return {
-            "x": (coordinates["left_cam"]["x"]  - self.cx) * z / self.fx,
-            "y": (coordinates["left_cam"]["y"]  - self.cy) * z / self.fy,
-            "z": z
-        }
+    #     return {
+    #         "x": (coordinates["left_cam"]["x"]  - self.cx) * z / self.fx,
+    #         "y": (coordinates["left_cam"]["y"]  - self.cy) * z / self.fy,
+    #         "z": z
+    #     }
     
     def createLandmakrDict(self, lx: float, ly: float, rx: float, ry: float) -> Dict:
         return {
@@ -118,3 +118,27 @@ class ProcessingUtils:
             }
         }
     
+    def triangulatePoints_CV(self, coordinates: Dict) -> Dict:
+        camL = coordinates["left_cam"]
+        camR = coordinates["right_cam"] 
+        # Formatieren für OpenCV (Shape: 2x1)
+        pointsL = np.array([[camL["x"]], [camL["y"]]], dtype=np.float64)
+        pointsR = np.array([[camR["x"]], [camR["y"]]], dtype=np.float64)
+
+        # OpenCV Triangulation
+        points4D = cv2.triangulatePoints(self.P1, self.P2, pointsL, pointsR)
+
+        # 4D in 3D umwandeln (X, Y, Z durch W teilen)
+        points3D = points4D[:3] / points4D[3:]
+
+        # .item() extrahiert die reine Python-Zahl (Float) aus dem NumPy-Array
+        x = points3D[0].item()
+        y = points3D[1].item()
+        z = points3D[2].item()
+        print(z)
+
+        return {
+            "x": x,
+            "y": y,
+            "z": z
+        }

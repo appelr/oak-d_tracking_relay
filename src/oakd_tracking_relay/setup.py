@@ -96,8 +96,8 @@ def main():
                 resultsR = model.process(rRGB)
 
                 if resultsL.multi_face_landmarks and resultsR.multi_face_landmarks:
-                    camLIrisL = resultsL.multi_face_landmarks[0].landmark[468]
-                    camRIrisL = resultsR.multi_face_landmarks[0].landmark[468]
+                    camLIrisL = resultsL.multi_face_landmarks[0].landmark[473]
+                    camRIrisL = resultsR.multi_face_landmarks[0].landmark[473]
 
                     landmarksIrisL = utils.createLandmakrDict(
                         camLIrisL.x, 
@@ -195,8 +195,8 @@ def main():
                 resultsR = model.process(rRGB)
 
                 if resultsL.multi_face_landmarks and resultsR.multi_face_landmarks:
-                    camLIrisL = resultsL.multi_face_landmarks[0].landmark[468]
-                    camRIrisL = resultsR.multi_face_landmarks[0].landmark[468]
+                    camLIrisL = resultsL.multi_face_landmarks[0].landmark[473]
+                    camRIrisL = resultsR.multi_face_landmarks[0].landmark[473]
 
                     mpStereo = utils.stereoLandmarkToPixelCoordinates(
                         utils.createLandmakrDict(camLIrisL.x, camLIrisL.y, camRIrisL.x, camRIrisL.y)
@@ -212,7 +212,9 @@ def main():
                         trackingConfidence = confidenceInit
 
             if stereoCoordinates is not None:
-                iris3D = utils.triangulatePoints(stereoCoordinates)
+                # iris3D = utils.triangulatePoints(stereoCoordinates)
+                iris3D = utils.triangulatePoints_CV(stereoCoordinates)
+
                 pointX, pointY = int(stereoCoordinates["left_cam"]["x"]), int(stereoCoordinates["left_cam"]["y"])
                 cv2.circle(displayFrame, (pointX, pointY), 5, (0, 255, 0), -1)
                 cv2.putText(displayFrame, f"X:{iris3D['x']:.0f} Y:{iris3D['y']:.0f} Z:{iris3D['z']:.0f}mm",

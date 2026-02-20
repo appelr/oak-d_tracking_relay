@@ -22,6 +22,10 @@ def main():
                         print("Frame skipped")
                         continue
                 
+                # frameL = cv2.rotate(frameL, cv2.ROTATE_180)
+                # frameR = cv2.rotate(frameR, cv2.ROTATE_180)
+                # frameL, frameR = frameR, frameL
+                
                 # Rectify
                 frameL, frameR = processingUtils.rectifyStereoFrame(frameL, frameR)
 

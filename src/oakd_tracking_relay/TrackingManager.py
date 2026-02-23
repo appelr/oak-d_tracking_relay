@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import mediapipe as mp
 
-from .TrackingDTO import StereoPoint, Point2D
+from .TrackingDTO import *
 from enum import Enum, auto
 
 class TrackerState(Enum):
@@ -16,7 +16,7 @@ class TrackerBase():
             self.config = config
             self.model = None
             self.currentState = TrackerState.SEARCHING
-            self.stereoCoordinates = StereoPoint()
+            self.stereoCoordinates = StereoPointCluster()
             self.prevFrameL = None
             self.prevFrameR = None
             self.trackingConfidence = 0
@@ -33,7 +33,7 @@ class TrackerBase():
                                         criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 20, 0.03))
             
 
-    def detect(self, frameL, frameR) -> StereoPoint:
+    def detect(self, frameL, frameR) -> StereoPointCluster:
         raise NotImplementedError("Please Implement this method")
     
 
@@ -43,19 +43,19 @@ class TrackerBase():
         if self.currentState == TrackerState.SEARCHING:
             self.search(frameL, frameR)
             
-        if self.currentState == TrackerState.TRACKING:
+        elif self.currentState == TrackerState.TRACKING:
             self.track(frameL, frameR)
 
 
     def search(self, frameL, frameR):
-        detectedPoint = self.detect(frameL, frameR)
+        detectedPointCluster = self.detect(frameL, frameR)
 
-        if detectedPoint.valid():
-            self.detectionBuffer.append(detectedPoint)
+        if detectedPointCluster.valid():
+            self.detectionBuffer.append(detectedPointCluster)
             
             if len(self.detectionBuffer) >= 3:
-                p1 = self.detectionBuffer[0].left
-                p3 = self.detectionBuffer[-1].left
+                p1 = self.detectionBuffer[0].aggregated.left
+                p3 = self.detectionBuffer[-1].aggregated.left
                 
                 # Distanz berechnen (hat sich das Auge bewegt?)
                 dist = np.sqrt((p1.x - p3.x)**2 + (p1.y - p3.y)**2)
@@ -74,41 +74,59 @@ class TrackerBase():
 
 
     def track(self, frameL, frameR): 
-        pointsL = self.stereoCoordinates.left.as_np().reshape(-1, 1, 2)
-        pointsR = self.stereoCoordinates.right.as_np().reshape(-1, 1, 2)
+        pointsL = [p.left.as_np() for p in self.stereoCoordinates.stereoPoints]
+        pointsR = [p.right.as_np() for p in self.stereoCoordinates.stereoPoints]
+
+        pointsL = np.array(pointsL, dtype=np.float32).reshape(-1, 1, 2)
+        pointsR = np.array(pointsR, dtype=np.float32).reshape(-1, 1, 2)
+
+        # pointsL = self.stereoCoordinates.left.as_np().reshape(-1, 1, 2)
+        # pointsR = self.stereoCoordinates.right.as_np().reshape(-1, 1, 2)
 
         nextPointsL, statusL, _ = cv2.calcOpticalFlowPyrLK(self.prevFrameL, frameL, pointsL, None, **self.opticalFlowParams) # type: ignore
         nextPointsR, statusR, _ = cv2.calcOpticalFlowPyrLK(self.prevFrameR, frameR, pointsR, None, **self.opticalFlowParams) # type: ignore
 
-        if statusL[0][0] == 1 and statusR[0][0] == 1:
-            nextLx, nextLy = nextPointsL[0][0]
-            nextRx, nextRy = nextPointsR[0][0]
+        cluster = StereoPointCluster()
 
-            distX = nextLx - self.stereoCoordinates.left.x
-            distY = nextLy - self.stereoCoordinates.left.y
-            prevDisp = (self.stereoCoordinates.left.x - self.stereoCoordinates.right.x)
-            currentDisp = nextLx - nextRx
+        for i in range(len(pointsL)):
+            if statusL[i][0] == 1 and statusR[i][0] == 1:
+                nextL = Point2D(float(nextPointsL[i][0][0]), float(nextPointsL[i][0][1]))
+                nextR = Point2D(float(nextPointsR[i][0][0]), float(nextPointsR[i][0][1]))
+                cluster.stereoPoints.append(StereoPoint(nextL, nextR))
 
-            if np.hypot(distX, distY) > self.maxJump or abs(currentDisp - prevDisp) > self.maxDispDelta:
-                self._decrease_confidence()
-                return
-            
-            self.stereoCoordinates = StereoPoint(Point2D(nextLx, nextLy), Point2D(nextRx, nextRy))
-            self.prevFrameL, self.prevFrameR = frameL.copy(), frameR.copy()
-            self.trackingConfidence = min(self.trackingConfidence + 1, self.confidenceInit)
-        else:
+        if len(cluster.stereoPoints) < 2:
             self._decrease_confidence(amount=2)
+            return
 
+        cluster.aggregate_mean()
+
+        oldCenter = self.stereoCoordinates.aggregated
+        newCenter = cluster.aggregated
+
+        distX = newCenter.left.x - oldCenter.left.x
+        distY = newCenter.left.y - oldCenter.left.y
+        prevDisp = oldCenter.left.x - oldCenter.right.x
+        currentDisp = newCenter.left.x - newCenter.right.x
+
+        if np.hypot(distX, distY) > self.maxJump or abs(currentDisp - prevDisp) > self.maxDispDelta:
+            self._decrease_confidence()
+            return
+        
+        self.stereoCoordinates = cluster
+        self.prevFrameL, self.prevFrameR = frameL.copy(), frameR.copy()
+        self.trackingConfidence = min(self.trackingConfidence + 1, self.confidenceInit)
+    
+        # RECHECK
         # if self.currentState == TrackerState.TRACKING and self.frameCounter % self.recheckInterval == 0:
         if self.frameCounter % self.recheckInterval == 0:
-            recheck_point = self.detect(frameL, frameR)
+            recheckPointCluster = self.detect(frameL, frameR)
 
-            if recheck_point.valid():
-                dist = np.hypot(recheck_point.left.x - self.stereoCoordinates.left.x, 
-                                recheck_point.left.y - self.stereoCoordinates.left.y)
+            if recheckPointCluster.valid():
+                dist = np.hypot(recheckPointCluster.aggregated.left.x - self.stereoCoordinates.aggregated.left.x, 
+                                recheckPointCluster.aggregated.left.y - self.stereoCoordinates.aggregated.left.y)
 
                 if dist > 6:
-                    self.stereoCoordinates = recheck_point
+                    self.stereoCoordinates = recheckPointCluster
                     self.prevFrameL, self.prevFrameR = frameL.copy(), frameR.copy()
                     self.trackingConfidence = self.confidenceInit
 
@@ -117,7 +135,7 @@ class TrackerBase():
         self.trackingConfidence -= amount
 
         if self.trackingConfidence <= self.confidenceMin:
-            self.stereoCoordinates = StereoPoint()
+            self.stereoCoordinates = StereoPointCluster()
             self.detectionBuffer = []
             self.currentState = TrackerState.SEARCHING
 
@@ -130,21 +148,29 @@ class EyeTracker(TrackerBase):
             min_detection_confidence=float(config.mp_min_detection_percent)/100, 
             min_tracking_confidence=float(config.mp_min_tracking_percent/100))
 
-    def detect(self, frameL, frameR) -> StereoPoint:
+    def detect(self, frameL, frameR) -> StereoPointCluster:
         lRGB = cv2.cvtColor(frameL, cv2.COLOR_GRAY2RGB)
         rRGB = cv2.cvtColor(frameR, cv2.COLOR_GRAY2RGB)
         
         resultsL = self.model.process(lRGB)
         resultsR = self.model.process(rRGB)
 
-        if resultsL.multi_face_landmarks and resultsR.multi_face_landmarks:
-            camLIrisL = resultsL.multi_face_landmarks[0].landmark[473]
-            camRIrisL = resultsR.multi_face_landmarks[0].landmark[473]
+        cluster = StereoPointCluster()
 
-            iris_stereo = StereoPoint(Point2D(camLIrisL.x, camLIrisL.y), Point2D(camRIrisL.x, camRIrisL.y))
-            return self.utils.stereoLandmarkToPixelCoordinates(iris_stereo)
+        if resultsL.multi_face_landmarks and resultsR.multi_face_landmarks:
+            iris_indices = [473, 474, 475, 476, 477]
+            for id in iris_indices:
+                camLIrisL = resultsL.multi_face_landmarks[0].landmark[id]
+                camRIrisL = resultsR.multi_face_landmarks[0].landmark[id]
+
+                iris_stereo = StereoPoint(Point2D(camLIrisL.x, camLIrisL.y), Point2D(camRIrisL.x, camRIrisL.y))
+                iris_stereo_px = self.utils.stereoLandmarkToPixelCoordinates(iris_stereo)
+                cluster.stereoPoints.append(iris_stereo_px)
+
+            if cluster.valid():
+                cluster.aggregate_mean()
         
-        return StereoPoint()
+        return cluster
 
 
 class HandTracker(TrackerBase):
@@ -156,5 +182,5 @@ class HandTracker(TrackerBase):
             min_detection_confidence=float(config.mp_min_detection_percent/100),
             min_tracking_confidence=float(config.mp_min_tracking_percent/100))
         
-    def detect(self, frameL, frameR) -> StereoPoint:
-        return StereoPoint()
+    def detect(self, frameL, frameR) -> StereoPointCluster:
+        return StereoPointCluster()

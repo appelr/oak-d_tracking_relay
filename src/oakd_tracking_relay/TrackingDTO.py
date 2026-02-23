@@ -43,20 +43,20 @@ class StereoPoint:
 @dataclass
 class StereoPointCluster:
     stereoPoints: List[StereoPoint] = field(default_factory=list)
-    #aggregated: StereoPoint = field(default_factory=StereoPoint)
+    aggregated: StereoPoint = field(default_factory=StereoPoint)
 
     def valid(self) -> bool:
         return len(self.stereoPoints) > 0
 
-    # def aggregate_mean(self):
-    #     left_pts = [p.left.as_np() for p in self.points if p.left.valid()]
-    #     right_pts = [p.right.as_np() for p in self.points if p.right.valid()]
+    def aggregate_mean(self):
+        left_pts = [p.left.as_np() for p in self.stereoPoints if p.left.valid()]
+        right_pts = [p.right.as_np() for p in self.stereoPoints if p.right.valid()]
 
-    #     if left_pts:
-    #         mean = np.mean(left_pts, axis=0)
-    #         self.aggregated.left = Point2D(*mean)
+        if left_pts:
+            mean = np.mean(left_pts, axis=0)
+            self.aggregated.left = Point2D(*mean)
 
-    #     if right_pts:
-    #         mean = np.mean(right_pts, axis=0)
-    #         self.aggregated.right = Point2D(*mean)
+        if right_pts:
+            mean = np.mean(right_pts, axis=0)
+            self.aggregated.right = Point2D(*mean)
 

@@ -7,15 +7,16 @@ import matplotlib.pyplot as plt
 
 from oakd_tracking_relay.ConfigurationManager import Configuration
 from oakd_tracking_relay.UDPManager import UDP
+from oakd_tracking_relay.TrackingDTO import *
 
 def generate_smooth_point(t: float, speed_x: float, speed_y: float, speed_z: float, 
                           amp_x: float, amp_y: float, amp_z: float, 
-                          offset_x: float, offset_y: float, offset_z: float) -> Dict[str, float]:
+                          offset_x: float, offset_y: float, offset_z: float) -> Point3D:
     """Generiert weiche, fortlaufende 3D-Koordinaten in Millimeter."""
     x = math.sin(t * speed_x) * amp_x + offset_x
     y = math.cos(t * speed_y) * amp_y + offset_y
     z = math.sin(t * speed_z) * amp_z + offset_z
-    return {"x": round(x, 2), "y": round(y, 2), "z": round(z, 2)}
+    return Point3D(round(x, 2), round(y, 2), round(z, 2))
 
 def main():
     config = Configuration.load("config.json")
@@ -57,8 +58,11 @@ def main():
                                                 amp_x=250.0, amp_y=150.0, amp_z=200.0,
                                                 offset_x=0.0, offset_y=0.0, offset_z=600.0)
             
-            irisL = {"x": round(head_center["x"] - 32.5, 2), "y": head_center["y"], "z": head_center["z"]}
-            irisR = {"x": round(head_center["x"] + 32.5, 2), "y": head_center["y"], "z": head_center["z"]}
+            # irisL = {"x": round(head_center["x"] - 32.5, 2), "y": head_center["y"], "z": head_center["z"]}
+            irisL = Point3D(round(head_center.x - 32.5, 2), head_center.y, head_center.z)
+            irisR = Point3D(round(head_center.x + 32.5, 2), head_center.y, head_center.z)
+
+            # irisR = {"x": round(head_center["x"] + 32.5, 2), "y": head_center["y"], "z": head_center["z"]}
 
             handL = generate_smooth_point(t, speed_x=1.2, speed_y=1.5, speed_z=0.9,
                                           amp_x=200.0, amp_y=200.0, amp_z=100.0,
@@ -73,10 +77,10 @@ def main():
 
             # --- PLOT UPDATEN ---
             # 1. Neue Werte an die Historie anhängen
-            hist_x_L.append(irisL["x"])
-            hist_y_L.append(irisL["y"])
-            hist_x_R.append(irisR["x"])
-            hist_y_R.append(irisR["y"])
+            hist_x_L.append(irisL.x)
+            hist_y_L.append(irisL.y)
+            hist_x_R.append(irisR.x)
+            hist_y_R.append(irisR.y)
 
             # 2. Die Daten im Plot aktualisieren
             lineL.set_data(hist_x_L, hist_y_L)

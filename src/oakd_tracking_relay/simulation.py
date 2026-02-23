@@ -49,7 +49,7 @@ def main():
     try:
         # Läuft solange, bis jemand das Plot-Fenster schließt
         while plt.fignum_exists(fig.number):
-            t = time.monotonic() - start_time
+            t = time.time()
             timestamp_ms = t * 1000.0
 
             # --- KOORDINATEN BERECHNEN ---

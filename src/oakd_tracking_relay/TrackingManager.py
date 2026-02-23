@@ -25,7 +25,7 @@ class TrackingEngine:
 class HeadTracker:
     def __init__(self, config: Configuration):
         self.config = config
-        self.model = mp.solutions.face_mesh.FaceMesh(
+        self.model = mp.solutions.face_mesh.FaceMesh( # type: ignore[attr-defined]
             max_num_faces=2, 
             refine_landmarks=True,
             min_detection_confidence=float(config.mp_min_detection_percent/100), 
@@ -60,7 +60,7 @@ class HeadTracker:
 class HandTracker:
     def __init__(self, config: Configuration):
         self.config = config
-        self.model = mp.solutions.hands.Hands(
+        self.model = mp.solutions.hands.Hands( # type: ignore[attr-defined]
             max_num_hands=2,
             model_complexity=0,
             min_detection_confidence=float(config.mp_min_detection_percent/100),

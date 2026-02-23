@@ -75,12 +75,12 @@ def main():
 
             eyeTracker.processFrame(frameL, frameR)
 
-            if eyeTracker.currentState == TrackerState.TRACKING and eyeTracker.stereoCoordinates.valid():
-                iris3D = utils.triangulatePoints_CV(eyeTracker.stereoCoordinates.aggregated)
+            if eyeTracker.currentState == TrackerState.TRACKING and eyeTracker.trackedData.valid():
+                irisLeft = utils.triangulatePoints_CV(eyeTracker.trackedData.aggregated)
 
-                pointX, pointY = int(eyeTracker.stereoCoordinates.aggregated.left.x), int(eyeTracker.stereoCoordinates.aggregated.left.y)
+                pointX, pointY = int(eyeTracker.trackedData.aggregated.left.x), int(eyeTracker.trackedData.aggregated.left.y)
                 cv2.circle(displayFrame, (pointX, pointY), 5, (0, 255, 0), -1)
-                cv2.putText(displayFrame, f"X:{iris3D.x:.0f} Y:{iris3D.y:.0f} Z:{iris3D.z:.0f}mm",
+                cv2.putText(displayFrame, f"X:{irisLeft.x:.0f} Y:{irisLeft.y:.0f} Z:{irisLeft.z:.0f}mm",
                             (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
                 cv2.imshow("Preview", displayFrame)
             else:

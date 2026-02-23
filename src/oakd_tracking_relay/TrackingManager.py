@@ -16,7 +16,7 @@ class TrackerBase():
             self.config = config
             self.model = None
             self.currentState = TrackerState.SEARCHING
-            self.stereoCoordinates = StereoPointCluster()
+            self.trackedData = StereoPointCluster()
             self.prevFrameL = None
             self.prevFrameR = None
             self.trackingConfidence = 0
@@ -62,7 +62,7 @@ class TrackerBase():
                 
                 # Wenn stabil (< 3 Pixel Bewegung) -> START TRACKING
                 if dist < 3.0:
-                    self.stereoCoordinates = self.detectionBuffer[-1]
+                    self.trackedData = self.detectionBuffer[-1]
                     self.prevFrameL, self.prevFrameR = frameL.copy(), frameR.copy()
                     self.trackingConfidence = self.confidenceInit
                     self.detectionBuffer = []
@@ -74,14 +74,14 @@ class TrackerBase():
 
 
     def track(self, frameL, frameR): 
-        pointsL = [p.left.as_np() for p in self.stereoCoordinates.stereoPoints]
-        pointsR = [p.right.as_np() for p in self.stereoCoordinates.stereoPoints]
+        pointsL = [p.left.as_np() for p in self.trackedData.stereoPoints]
+        pointsR = [p.right.as_np() for p in self.trackedData.stereoPoints]
 
         pointsL = np.array(pointsL, dtype=np.float32).reshape(-1, 1, 2)
         pointsR = np.array(pointsR, dtype=np.float32).reshape(-1, 1, 2)
 
-        # pointsL = self.stereoCoordinates.left.as_np().reshape(-1, 1, 2)
-        # pointsR = self.stereoCoordinates.right.as_np().reshape(-1, 1, 2)
+        # pointsL = self.trackedData.left.as_np().reshape(-1, 1, 2)
+        # pointsR = self.trackedData.right.as_np().reshape(-1, 1, 2)
 
         nextPointsL, statusL, _ = cv2.calcOpticalFlowPyrLK(self.prevFrameL, frameL, pointsL, None, **self.opticalFlowParams) # type: ignore
         nextPointsR, statusR, _ = cv2.calcOpticalFlowPyrLK(self.prevFrameR, frameR, pointsR, None, **self.opticalFlowParams) # type: ignore
@@ -100,7 +100,7 @@ class TrackerBase():
 
         cluster.aggregate_mean()
 
-        oldCenter = self.stereoCoordinates.aggregated
+        oldCenter = self.trackedData.aggregated
         newCenter = cluster.aggregated
 
         distX = newCenter.left.x - oldCenter.left.x
@@ -112,7 +112,7 @@ class TrackerBase():
             self._decrease_confidence()
             return
         
-        self.stereoCoordinates = cluster
+        self.trackedData = cluster
         self.prevFrameL, self.prevFrameR = frameL.copy(), frameR.copy()
         self.trackingConfidence = min(self.trackingConfidence + 1, self.confidenceInit)
     
@@ -122,11 +122,11 @@ class TrackerBase():
             recheckPointCluster = self.detect(frameL, frameR)
 
             if recheckPointCluster.valid():
-                dist = np.hypot(recheckPointCluster.aggregated.left.x - self.stereoCoordinates.aggregated.left.x, 
-                                recheckPointCluster.aggregated.left.y - self.stereoCoordinates.aggregated.left.y)
+                dist = np.hypot(recheckPointCluster.aggregated.left.x - self.trackedData.aggregated.left.x, 
+                                recheckPointCluster.aggregated.left.y - self.trackedData.aggregated.left.y)
 
                 if dist > 6:
-                    self.stereoCoordinates = recheckPointCluster
+                    self.trackedData = recheckPointCluster
                     self.prevFrameL, self.prevFrameR = frameL.copy(), frameR.copy()
                     self.trackingConfidence = self.confidenceInit
 
@@ -135,7 +135,7 @@ class TrackerBase():
         self.trackingConfidence -= amount
 
         if self.trackingConfidence <= self.confidenceMin:
-            self.stereoCoordinates = StereoPointCluster()
+            self.trackedData = StereoPointCluster()
             self.detectionBuffer = []
             self.currentState = TrackerState.SEARCHING
 

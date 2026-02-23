@@ -4,13 +4,8 @@ import mediapipe as mp
 import numpy as np
 import depthai as dai
 
-from typing import Tuple, Dict
 from .TrackingDTO import *
 
-class Utils: 
-    def __init__(self, config):
-        self.config = config
-    
 class ProcessingUtils:
     def __init__(self, camera, config):
         self.camera = camera

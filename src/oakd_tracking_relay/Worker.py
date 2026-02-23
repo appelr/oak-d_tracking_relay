@@ -1,7 +1,7 @@
 import time
 
 from .ConfigurationManager import Configuration
-from .TrackingManager import TrackingEngine
+from .TrackingManager_old import TrackingEngine
 from .UDPManager import UDP
 from .CameraManager import OakD
 from .Utils import ProcessingUtils

@@ -124,7 +124,7 @@ class TrackerBase():
 class EyeTracker(TrackerBase):
     def __init__(self, utils, config):
         super().__init__(utils, config)
-        self.model = mp.solutions.face_mesh.FaceMesh(
+        self.model = mp.solutions.face_mesh.FaceMesh( # type: ignore[attr-defined]
             max_num_faces=2, 
             refine_landmarks=True,
             min_detection_confidence=float(config.mp_min_detection_percent)/100, 

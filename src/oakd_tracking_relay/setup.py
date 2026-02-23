@@ -4,7 +4,7 @@ import cv2
 from oakd_tracking_relay.ConfigurationManager import Configuration
 from oakd_tracking_relay.CameraManager import OakD
 from oakd_tracking_relay.Utils import ProcessingUtils
-from oakd_tracking_relay.TrackingManager_new import EyeTracker, TrackerState
+from oakd_tracking_relay.TrackingManager import EyeTracker, TrackerState
 from oakd_tracking_relay.TrackingDTO import *
 
 def main():

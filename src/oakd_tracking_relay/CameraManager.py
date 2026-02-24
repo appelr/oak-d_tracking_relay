@@ -17,6 +17,7 @@ class OakD:
     def __enter__(self):
         self.device = dai.Device(self.pipeline, maxUsbSpeed=dai.UsbSpeed.SUPER_PLUS)
         try:
+            print("USB Speed:", self.device.getUsbSpeed())
             self.device.setIrLaserDotProjectorIntensity(0.0)
             self.device.setIrFloodLightIntensity(float(self.config.ir_laser_intensity_percent/100))
         except: 

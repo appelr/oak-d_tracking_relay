@@ -95,10 +95,7 @@ class OakD:
             pass
 
     def get_frames(self):
-        msgGroup = self.qSync.tryGet()
-
-        while self.qSync.has(): 
-            msgGroup = self.qSync.get()
+        msgGroup = self.qSync.get()
 
         if msgGroup is not None:
             inLeft = msgGroup["left"]

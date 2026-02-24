@@ -15,12 +15,12 @@ def main():
         pass
     
     cv2.createTrackbar("ISO", "Preview", config.iso, config.iso, nothing)
-    cv2.setTrackbarMin("ISO", "Preview", 100)
-    cv2.setTrackbarMax("ISO", "Preview", 600)
+    cv2.setTrackbarMin("ISO", "Preview", 400)
+    cv2.setTrackbarMax("ISO", "Preview", 1000)
 
     cv2.createTrackbar("Exposure", "Preview", config.exposure_us, config.exposure_us, nothing)
-    cv2.setTrackbarMin("Exposure", "Preview", 100)
-    cv2.setTrackbarMax("Exposure", "Preview", 800)
+    cv2.setTrackbarMin("Exposure", "Preview", 10)
+    cv2.setTrackbarMax("Exposure", "Preview", 100)
 
     cv2.createTrackbar("IR Laser", "Preview", config.ir_laser_intensity_percent, config.ir_laser_intensity_percent, nothing)
     cv2.setTrackbarMin("IR Laser", "Preview", 0)
@@ -38,6 +38,7 @@ def main():
         utils = ProcessingUtils(camera=camera, config=config)
         
         eyeTracker = EyeTracker(utils, config)
+        prev_frame_time = 0.0
 
         while True:
             # Config Änderungen
@@ -72,14 +73,17 @@ def main():
             
             frameL, frameR = utils.rectifyStereoFrame(frameL, frameR)
             displayFrame = cv2.cvtColor(frameL, cv2.COLOR_GRAY2BGR)
+            current_frame_time = time.perf_counter()
+            if current_frame_time != 0:
+                fps = 1.0 / (current_frame_time - prev_frame_time)
+            else:
+                fps = 0.0
+            prev_frame_time = current_frame_time
 
-            start = time.perf_counter()
             eyeTracker.processFrame(frameL, frameR)
-            elapsed_ms = (time.perf_counter() - start) * 1000
-            print(f"{elapsed_ms:.2f} ms")
-
 
             if eyeTracker.currentState == TrackerState.TRACKING and eyeTracker.trackingData.valid():
+                print(fps)
                 irisLeft = utils.triangulatePoints_CV(eyeTracker.trackingData.left.aggregated)
                 irisRight = utils.triangulatePoints_CV(eyeTracker.trackingData.right.aggregated)
 
@@ -92,9 +96,11 @@ def main():
                             (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
                 cv2.putText(displayFrame, f"Right: X:{irisRight.x:.0f} Y:{irisRight.y:.0f} Z:{irisRight.z:.0f}mm",
                             (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                cv2.imshow("Preview", displayFrame)
+                cv2.putText(displayFrame, f"FPS: {int(fps)}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                # cv2.imshow("Preview", displayFrame)
             else:
-                cv2.imshow("Preview", frameL)
+                cv2.putText(displayFrame, f"FPS: {int(fps)}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                # cv2.imshow("Preview", frameL)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break

@@ -73,15 +73,25 @@ def main():
             frameL, frameR = utils.rectifyStereoFrame(frameL, frameR)
             displayFrame = cv2.cvtColor(frameL, cv2.COLOR_GRAY2BGR)
 
+            start = time.perf_counter()
             eyeTracker.processFrame(frameL, frameR)
+            elapsed_ms = (time.perf_counter() - start) * 1000
+            print(f"{elapsed_ms:.2f} ms")
 
-            if eyeTracker.currentState == TrackerState.TRACKING and eyeTracker.trackedData.valid():
-                irisLeft = utils.triangulatePoints_CV(eyeTracker.trackedData.aggregated)
 
-                pointX, pointY = int(eyeTracker.trackedData.aggregated.left.x), int(eyeTracker.trackedData.aggregated.left.y)
-                cv2.circle(displayFrame, (pointX, pointY), 5, (0, 255, 0), -1)
-                cv2.putText(displayFrame, f"X:{irisLeft.x:.0f} Y:{irisLeft.y:.0f} Z:{irisLeft.z:.0f}mm",
-                            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            if eyeTracker.currentState == TrackerState.TRACKING and eyeTracker.trackingData.valid():
+                irisLeft = utils.triangulatePoints_CV(eyeTracker.trackingData.left.aggregated)
+                irisRight = utils.triangulatePoints_CV(eyeTracker.trackingData.right.aggregated)
+
+                leftPointX, leftPointY = int(eyeTracker.trackingData.left.aggregated.left.x), int(eyeTracker.trackingData.left.aggregated.left.y)
+                rightPointX, rightPointY = int(eyeTracker.trackingData.right.aggregated.left.x), int(eyeTracker.trackingData.right.aggregated.left.y)
+                cv2.circle(displayFrame, (leftPointX, leftPointY), 5, (0, 255, 255), -1)
+                cv2.circle(displayFrame, (rightPointX, rightPointY), 5, (0, 255, 0), -1)
+
+                cv2.putText(displayFrame, f"Left: X:{irisLeft.x:.0f} Y:{irisLeft.y:.0f} Z:{irisLeft.z:.0f}mm",
+                            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                cv2.putText(displayFrame, f"Right: X:{irisRight.x:.0f} Y:{irisRight.y:.0f} Z:{irisRight.z:.0f}mm",
+                            (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
                 cv2.imshow("Preview", displayFrame)
             else:
                 cv2.imshow("Preview", frameL)

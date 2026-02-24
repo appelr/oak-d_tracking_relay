@@ -39,7 +39,7 @@ def main():
         
         eyeTracker = EyeTracker(utils, config)
         prev_frame_time = 0.0
-
+        smoothed_dt = 0.0
         while True:
             # Config Änderungen
             new_iso = cv2.getTrackbarPos("ISO", "Preview")
@@ -73,12 +73,29 @@ def main():
             
             frameL, frameR = utils.rectifyStereoFrame(frameL, frameR)
             displayFrame = cv2.cvtColor(frameL, cv2.COLOR_GRAY2BGR)
+
+
+            # ==========================================
+            # FPS KORREKT GEGLÄTTET BERECHNEN
+            # ==========================================
             current_frame_time = time.perf_counter()
-            if current_frame_time != 0:
-                fps = 1.0 / (current_frame_time - prev_frame_time)
+            if prev_frame_time != 0:
+                dt = current_frame_time - prev_frame_time # Verstrichene Zeit für diesen Frame
+                
+                if smoothed_dt == 0.0:
+                    smoothed_dt = dt
+                else:
+                    # Wir glätten die Sekunden! 90% alter Zeitwert, 10% neuer Zeitwert
+                    smoothed_dt = (smoothed_dt * 0.90) + (dt * 0.10)
+                
+                # FPS ist 1 / durchschnittliche Dauer
+                fps = 1.0 / smoothed_dt 
             else:
                 fps = 0.0
+                
             prev_frame_time = current_frame_time
+            # ==========================================
+        
 
             eyeTracker.processFrame(frameL, frameR)
 
@@ -97,12 +114,13 @@ def main():
                 cv2.putText(displayFrame, f"Right: X:{irisRight.x:.0f} Y:{irisRight.y:.0f} Z:{irisRight.z:.0f}mm",
                             (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
                 cv2.putText(displayFrame, f"FPS: {int(fps)}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                # cv2.imshow("Preview", displayFrame)
+                cv2.imshow("Preview", displayFrame)
             else:
                 cv2.putText(displayFrame, f"FPS: {int(fps)}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                # cv2.imshow("Preview", frameL)
+                cv2.imshow("Preview", frameL)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
+            # if 0xFF == ord('q'):
                 break
 
         cv2.destroyAllWindows()

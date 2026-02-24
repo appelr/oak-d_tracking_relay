@@ -97,6 +97,5 @@ class ProcessingUtils:
         x = points3D[0].item()
         y = points3D[1].item()
         z = points3D[2].item()
-        print(z)
 
         return Point3D(x, y, z)

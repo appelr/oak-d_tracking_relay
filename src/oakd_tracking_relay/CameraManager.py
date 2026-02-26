@@ -8,8 +8,6 @@ class OakD:
         self.config = config
         self.pipeline = self._createPipeline()
         self.device = None
-        # self.qLeft = None
-        # self.qRight = None
         self.qSync = None
         self.qControl = None
         self.referenceTime = None
@@ -60,13 +58,7 @@ class OakD:
 
         syncNode = pipeline.create(dai.node.Sync)
 
-        # # Outputs
-        # xoutLeft = pipeline.create(dai.node.XLinkOut)
-        # xoutLeft.setStreamName("left")
-        
-        # xoutRight = pipeline.create(dai.node.XLinkOut)
-        # xoutRight.setStreamName("right")
-
+        # Outputs
         monoLeft.out.link(syncNode.inputs["left"])
         monoRight.out.link(syncNode.inputs["right"])
 

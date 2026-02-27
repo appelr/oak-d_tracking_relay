@@ -1,8 +1,15 @@
 from dataclasses import dataclass, asdict
 import depthai as dai
 import json
+import cv2
 import os
 import sys
+
+
+@dataclass
+class RuntimeState:
+    update_trigger: bool = True
+    showPreview: bool = True
 
 @dataclass
 class Configuration:
@@ -22,9 +29,6 @@ class Configuration:
     # Tracking
     mp_min_detection_percent: int = 40
     mp_min_tracking_percent: int = 20
-
-    # Update Logic
-    update_trigger: bool = False
 
     def save(self, filename="config.json"):
         data = asdict(self)
@@ -59,3 +63,74 @@ class Configuration:
             raise e
             
         return config
+    
+class ConfigurationUI:
+    def __init__(self, camera, config: Configuration, state: RuntimeState):
+        self.config = config
+        self.state = state
+        self.camera = camera
+        self.window_name = "Preview"
+        self.enabled = True
+        self._create()
+
+    def _nothing(self, x):
+        pass
+
+    def _create(self):
+        cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
+
+        cv2.createTrackbar("ISO", self.window_name, self.config.iso, 1000, self._nothing)
+        cv2.setTrackbarMin("ISO", self.window_name, 400)
+
+        cv2.createTrackbar("Exposure", self.window_name, self.config.exposure_us, 100, self._nothing)
+        cv2.setTrackbarMin("Exposure", self.window_name, 10)
+
+        cv2.createTrackbar("IR Laser", self.window_name, self.config.ir_laser_intensity_percent, 100, self._nothing)
+        cv2.createTrackbar("Min. Detection", self.window_name, self.config.mp_min_detection_percent, 100, self._nothing)
+        cv2.createTrackbar("Min. Tracking", self.window_name, self.config.mp_min_tracking_percent, 100, self._nothing)
+
+    def update_config_if_changed(self):
+        if not self.enabled:
+            return
+
+        new_values = {
+            "iso": cv2.getTrackbarPos("ISO", self.window_name),
+            "exposure_us": cv2.getTrackbarPos("Exposure", self.window_name),
+            "ir_laser_intensity_percent": cv2.getTrackbarPos("IR Laser", self.window_name),
+            "mp_min_detection_percent": cv2.getTrackbarPos("Min. Detection", self.window_name),
+            "mp_min_tracking_percent": cv2.getTrackbarPos("Min. Tracking", self.window_name),
+        }
+
+        changed = False
+        for k, v in new_values.items():
+            if getattr(self.config, k) != v:
+                setattr(self.config, k, v)
+                changed = True
+
+        if changed:
+            self.state.update_trigger = True
+            self.camera._updateSettings()
+            self.state.update_trigger = False
+            self.config.save()
+
+    def window_closed(self):
+        return cv2.getWindowProperty(self.window_name, cv2.WND_PROP_VISIBLE) < 1
+
+    def should_close(self):
+        if not self.enabled:
+            return True
+
+        # Fenster per X geschlossen
+        if cv2.getWindowProperty(self.window_name, cv2.WND_PROP_VISIBLE) < 1:
+            return True
+
+        # Tastendruck
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            return True
+
+        return False
+
+    def shutdown(self):
+        if self.enabled:
+            cv2.destroyWindow(self.window_name)
+        self.enabled = False

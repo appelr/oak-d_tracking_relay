@@ -3,12 +3,11 @@
     "udp_port_head": 5005,
     "udp_port_hands": 5006,
     "fps": 100,
-    "exposure_us": 608,
-    "iso": 263,
+    "exposure_us": 10,
+    "iso": 722,
     "ir_laser_intensity_percent": 100,
     "resolutionWidth": 640,
     "resolutionHeight": 400,
     "mp_min_detection_percent": 9,
-    "mp_min_tracking_percent": 28,
-    "update_trigger": false
+    "mp_min_tracking_percent": 28
 }

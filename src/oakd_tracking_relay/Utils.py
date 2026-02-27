@@ -1,4 +1,5 @@
 import cv2
+import time
 
 import mediapipe as mp
 import numpy as np
@@ -62,6 +63,10 @@ class ProcessingUtils:
             cv2.CV_16SC2
         )
 
+        # Data rate calculation
+        self.prev_frame_time = 0.0
+        self.smoothed_dt = 0.0
+
     def stereoLandmarkToPixelCoordinates(self, stereoPoint: StereoPoint) -> StereoPoint: 
         leftCam = stereoPoint.left
         rightCam = stereoPoint.right
@@ -99,3 +104,22 @@ class ProcessingUtils:
         z = points3D[2].item()
 
         return Point3D(x, y, z)
+    
+    def getDataRate(self):
+        current_frame_time = time.perf_counter()
+        if self.prev_frame_time != 0:
+            dt = current_frame_time - self.prev_frame_time # Verstrichene Zeit für diesen Frame
+            
+            if self.smoothed_dt == 0.0:
+                self.smoothed_dt = dt
+            else:
+                # Wir glätten die Sekunden! 90% alter Zeitwert, 10% neuer Zeitwert
+                self.smoothed_dt = (self.smoothed_dt * 0.90) + (dt * 0.10)
+            
+            # FPS ist 1 / durchschnittliche Dauer
+            dataRate = 1.0 / self.smoothed_dt 
+        else:
+            dataRate = 0.0
+            
+        self.prev_frame_time = current_frame_time
+        return dataRate

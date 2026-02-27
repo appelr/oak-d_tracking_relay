@@ -1,11 +1,12 @@
 import depthai as dai
 import time
 from datetime import timedelta
-from .ConfigurationManager import Configuration
+from .ConfigurationManager import Configuration, RuntimeState
 
 class OakD:
-    def __init__(self, config: Configuration):
+    def __init__(self, config: Configuration, state: RuntimeState):
         self.config = config
+        self.state = state
         self.pipeline = self._createPipeline()
         self.device = None
         self.qSync = None
@@ -73,7 +74,7 @@ class OakD:
         if self.qControl is None: 
             return
         
-        if not getattr(self.config, 'update_trigger', False): 
+        if not getattr(self.state, 'update_trigger', False): 
             return
         
         cameraControl = dai.CameraControl()

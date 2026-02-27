@@ -6,9 +6,11 @@ from oakd_tracking_relay.CameraManager import OakD
 from oakd_tracking_relay.Utils import ProcessingUtils
 from oakd_tracking_relay.TrackingManager import EyeTracker, TrackerState
 from oakd_tracking_relay.TrackingDTO import *
+from oakd_tracking_relay.UDPManager import UDP
 
 def main():
     config = Configuration.load("config.json")
+    udpManager = UDP(config)
     cv2.namedWindow("Preview")
 
     def nothing(x): 
@@ -60,7 +62,7 @@ def main():
                 config.save()
 
             # Verarbeitung
-            frameL, frameR, _ = camera.get_frames()
+            frameL, frameR, timeStamp = camera.get_frames()
 
             if frameL is None or frameR is None:
                 time.sleep(0.002)
@@ -103,6 +105,7 @@ def main():
                 print(fps)
                 irisLeft = utils.triangulatePoints_CV(eyeTracker.trackingData.left.aggregated)
                 irisRight = utils.triangulatePoints_CV(eyeTracker.trackingData.right.aggregated)
+                udpManager.send(irisLeft, irisRight, Point3D(), Point3D(), timeStamp)
 
                 leftPointX, leftPointY = int(eyeTracker.trackingData.left.aggregated.left.x), int(eyeTracker.trackingData.left.aggregated.left.y)
                 rightPointX, rightPointY = int(eyeTracker.trackingData.right.aggregated.left.x), int(eyeTracker.trackingData.right.aggregated.left.y)
@@ -114,13 +117,13 @@ def main():
                 cv2.putText(displayFrame, f"Right: X:{irisRight.x:.0f} Y:{irisRight.y:.0f} Z:{irisRight.z:.0f}mm",
                             (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
                 cv2.putText(displayFrame, f"FPS: {int(fps)}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                cv2.imshow("Preview", displayFrame)
+                #cv2.imshow("Preview", displayFrame)
             else:
                 cv2.putText(displayFrame, f"FPS: {int(fps)}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                cv2.imshow("Preview", frameL)
+                #cv2.imshow("Preview", frameL)
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-            # if 0xFF == ord('q'):
+            #if cv2.waitKey(1) & 0xFF == ord('q'):
+            if 0xFF == ord('q'):
                 break
 
         cv2.destroyAllWindows()

@@ -5,6 +5,8 @@ import cv2
 import os
 import sys
 
+from oakd_tracking_relay.TrackingDTO import *
+
 
 @dataclass
 class RuntimeState:
@@ -70,9 +72,11 @@ class ConfigurationUI:
         self.state = state
         self.camera = camera
         self.window_name = "Preview"
+        self.displayFrame = None
         self.enabled = True
         self._create()
 
+    # Needed by OpenCV
     def _nothing(self, x):
         pass
 
@@ -89,7 +93,21 @@ class ConfigurationUI:
         cv2.createTrackbar("Min. Detection", self.window_name, self.config.mp_min_detection_percent, 100, self._nothing)
         cv2.createTrackbar("Min. Tracking", self.window_name, self.config.mp_min_tracking_percent, 100, self._nothing)
 
-    def update_config_if_changed(self):
+    def shouldExit(self):
+        return cv2.waitKey(1) & 0xFF == ord("q")
+
+    def exit(self):
+        cv2.destroyAllWindows()
+        cv2.waitKey(1)  
+
+    def setDisplayFrame(self, frame):
+        self.displayFrame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+
+    def show(self):
+        if self.displayFrame is not None:
+            cv2.imshow(self.window_name, self.displayFrame)
+
+    def updateConfigIfChanged(self):
         if not self.enabled:
             return
 
@@ -113,24 +131,13 @@ class ConfigurationUI:
             self.state.update_trigger = False
             self.config.save()
 
-    def window_closed(self):
-        return cv2.getWindowProperty(self.window_name, cv2.WND_PROP_VISIBLE) < 1
+    def drawTrackingData(self, trackingData: TrackingData, dataRate):
+        if trackingData.valid():
+            leftPointX, leftPointY = int(trackingData.left.aggregated.left.x), int(trackingData.left.aggregated.left.y)
+            rightPointX, rightPointY = int(trackingData.right.aggregated.left.x), int(trackingData.right.aggregated.left.y)
+            if self.displayFrame is not None:
+                cv2.circle(self.displayFrame, (leftPointX, leftPointY), 5, (0, 255, 255), -1)
+                cv2.circle(self.displayFrame, (rightPointX, rightPointY), 5, (0, 255, 0), -1)
+                cv2.putText(self.displayFrame, f"FPS: {int(dataRate)}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
-    def should_close(self):
-        if not self.enabled:
-            return True
-
-        # Fenster per X geschlossen
-        if cv2.getWindowProperty(self.window_name, cv2.WND_PROP_VISIBLE) < 1:
-            return True
-
-        # Tastendruck
-        if cv2.waitKey(1) & 0xFF == ord("q"):
-            return True
-
-        return False
-
-    def shutdown(self):
-        if self.enabled:
-            cv2.destroyWindow(self.window_name)
-        self.enabled = False
+        

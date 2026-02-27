@@ -15,6 +15,7 @@ def main():
 
     with OakD(config, state) as camera:
         utils = ProcessingUtils(camera=camera, config=config)
+
         ui = ConfigurationUI(camera, config, state)
 
         eyeTracker = EyeTracker(utils, config)
@@ -35,36 +36,23 @@ def main():
             frameL, frameR = utils.rectifyStereoFrame(frameL, frameR)
             
             eyeTracker.processFrame(frameL, frameR)
-
-            if state.showPreview:
-                key = cv2.waitKey(1) & 0xFF
-                if key == ord("q") or ui.window_closed():
-                    ui.shutdown()
-                    cv2.destroyAllWindows()
-                    cv2.waitKey(1)
-                    state.showPreview = False
-                    print(
-                        "Preview geschlossen – läuft headless weiter")
-
-                ui.update_config_if_changed()
-                displayFrame = cv2.cvtColor(frameL, cv2.COLOR_GRAY2BGR)
+            dataRate = utils.getDataRate()
 
             if eyeTracker.currentState == TrackerState.TRACKING and eyeTracker.trackingData.valid():
-                dataRate = utils.getDataRate()
                 print(dataRate)
-                
                 irisLeft = utils.triangulatePoints_CV(eyeTracker.trackingData.left.aggregated)
                 irisRight = utils.triangulatePoints_CV(eyeTracker.trackingData.right.aggregated)
                 udpManager.send(irisLeft, irisRight, Point3D(), Point3D(), timeStamp)
-                
-                if state.showPreview: 
-                    leftPointX, leftPointY = int(eyeTracker.trackingData.left.aggregated.left.x), int(eyeTracker.trackingData.left.aggregated.left.y)
-                    rightPointX, rightPointY = int(eyeTracker.trackingData.right.aggregated.left.x), int(eyeTracker.trackingData.right.aggregated.left.y)
-                    cv2.circle(displayFrame, (leftPointX, leftPointY), 5, (0, 255, 255), -1)
-                    cv2.circle(displayFrame, (rightPointX, rightPointY), 5, (0, 255, 0), -1)
 
             if state.showPreview:
-                cv2.imshow(ui.window_name, displayFrame)
+                if ui.shouldExit():
+                    ui.exit()
+                    state.showPreview = False
+                else:
+                    ui.updateConfigIfChanged()
+                    ui.setDisplayFrame(frameL)
+                    ui.drawTrackingData(eyeTracker.trackingData, dataRate)
+                    ui.show()
             
 if __name__ == "__main__":
     main()

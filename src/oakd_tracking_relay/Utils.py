@@ -156,3 +156,12 @@ class ProcessingUtils:
         # Kombinierter Score (größer = besser)
         score = area_weight * area - center_weight * center_dist
         return score
+    
+    def cropFrame(self, frame, scale=0.5):
+        h, w = frame.shape[:2]
+        ch, cw = int(h * scale), int(w * scale)
+
+        y0 = (h - ch) // 2
+        x0 = (w - cw) // 2
+
+        return frame[y0:y0+ch, x0:x0+cw], x0, y0

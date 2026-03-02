@@ -181,11 +181,14 @@ class EyeTracker(TrackerBase):
             min_tracking_confidence=float(config.mp_min_tracking_percent/100))
 
     def detect(self, frameL, frameR) -> TrackingData:
-        lRGB = cv2.cvtColor(frameL, cv2.COLOR_GRAY2RGB)
-        rRGB = cv2.cvtColor(frameR, cv2.COLOR_GRAY2RGB)
-        
-        resultsL = self.model.process(lRGB)
-        resultsR = self.model.process(rRGB)
+        cropL, offxL, offyL = self.utils.cropFrame(frameL)
+        cropR, offxR, offyR = self.utils.cropFrame(frameR)
+
+        cropLRGB = cv2.cvtColor(cropL, cv2.COLOR_GRAY2RGB)
+        cropRRGB = cv2.cvtColor(cropR, cv2.COLOR_GRAY2RGB)
+
+        resultsL = self.model.process(cropLRGB)
+        resultsR = self.model.process(cropRRGB)
 
         data = TrackingData()
 
@@ -195,23 +198,26 @@ class EyeTracker(TrackerBase):
 
             bestFaceId = self.utils.getBestFace(resultsL, resultsR)
 
-            for leftId in leftIrisIndices:
-                camLIrisL = resultsL.multi_face_landmarks[bestFaceId].landmark[leftId]
-                camRIrisL = resultsR.multi_face_landmarks[bestFaceId].landmark[leftId]
-                leftIris = StereoPoint(Point2D(camLIrisL.x, camLIrisL.y), Point2D(camRIrisL.x, camRIrisL.y))
-                leftIrisPx = self.utils.stereoLandmarkToPixelCoordinates(leftIris)
-                data.left.stereoPoints.append(leftIrisPx)
+            landmarksL = resultsL.multi_face_landmarks[bestFaceId]
+            landmarksR = resultsR.multi_face_landmarks[bestFaceId]
 
-            for rightId in rightIrisIndices:
-                camLIrisR = resultsL.multi_face_landmarks[bestFaceId].landmark[rightId]
-                camRIrisR = resultsR.multi_face_landmarks[bestFaceId].landmark[rightId]
-                rightIris = StereoPoint(Point2D(camLIrisR.x, camLIrisR.y), Point2D(camRIrisR.x, camRIrisR.y))
-                rightIrisPx = self.utils.stereoLandmarkToPixelCoordinates(rightIris)
-                data.right.stereoPoints.append(rightIrisPx)
+            # linkes Auge
+            for idx in leftIrisIndices:
+                left  = Point2D(offxL + landmarksL.landmark[idx].x * cropL.shape[1],offyL + landmarksL.landmark[idx].y * cropL.shape[0])
+                right = Point2D(offxR + landmarksR.landmark[idx].x * cropR.shape[1],offyR + landmarksR.landmark[idx].y * cropR.shape[0])
+                data.left.stereoPoints.append(StereoPoint(left, right))
+
+            # rechtes Auge
+            for idx in rightIrisIndices:
+                left  = Point2D(offxL + landmarksL.landmark[idx].x * cropL.shape[1],
+                                    offyL + landmarksL.landmark[idx].y * cropL.shape[0])
+                right = Point2D(offxR + landmarksR.landmark[idx].x * cropR.shape[1],
+                                    offyR + landmarksR.landmark[idx].y * cropR.shape[0])
+                data.right.stereoPoints.append(StereoPoint(left, right))
 
             if data.valid():
                 data.aggregate_median()
-        
+
         return data
 
 

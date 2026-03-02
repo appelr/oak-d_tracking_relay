@@ -31,9 +31,9 @@ class TrackerBase():
             self.maxJump = 35
             self.maxDispDelta = 10
             self.searchStabilityThreshold = 20
-            self.recheckCorrectionThreshold = 3
-            self.recheckInterval = 10
-            self.opticalFlowParams = dict(winSize=(12, 12), maxLevel=5,
+            self.recheckCorrectionThreshold = 1.5
+            self.recheckInterval = 15
+            self.opticalFlowParams = dict(winSize=(8, 8), maxLevel=5,
                                         criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 20, 0.03))
             
 

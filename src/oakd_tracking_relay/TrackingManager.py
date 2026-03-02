@@ -175,7 +175,7 @@ class EyeTracker(TrackerBase):
     def __init__(self, utils, config):
         super().__init__(utils, config)
         self.model = mp.solutions.face_mesh.FaceMesh( # type: ignore[attr-defined]
-            max_num_faces=2, 
+            max_num_faces=4, 
             refine_landmarks=True,
             min_detection_confidence=float(config.mp_min_detection_percent)/100, 
             min_tracking_confidence=float(config.mp_min_tracking_percent/100))
@@ -192,16 +192,19 @@ class EyeTracker(TrackerBase):
         if resultsL.multi_face_landmarks and resultsR.multi_face_landmarks:
             leftIrisIndices = [468, 469, 470, 471, 472]
             rightIrisIndices = [473, 474, 475, 476, 477]
+
+            bestFaceId = self.utils.selectBestFace(resultsL, resultsR)
+
             for leftId in leftIrisIndices:
-                camLIrisL = resultsL.multi_face_landmarks[0].landmark[leftId]
-                camRIrisL = resultsR.multi_face_landmarks[0].landmark[leftId]
+                camLIrisL = resultsL.multi_face_landmarks[bestFaceId].landmark[leftId]
+                camRIrisL = resultsR.multi_face_landmarks[bestFaceId].landmark[leftId]
                 leftIris = StereoPoint(Point2D(camLIrisL.x, camLIrisL.y), Point2D(camRIrisL.x, camRIrisL.y))
                 leftIrisPx = self.utils.stereoLandmarkToPixelCoordinates(leftIris)
                 data.left.stereoPoints.append(leftIrisPx)
 
             for rightId in rightIrisIndices:
-                camLIrisR = resultsL.multi_face_landmarks[0].landmark[rightId]
-                camRIrisR = resultsR.multi_face_landmarks[0].landmark[rightId]
+                camLIrisR = resultsL.multi_face_landmarks[bestFaceId].landmark[rightId]
+                camRIrisR = resultsR.multi_face_landmarks[bestFaceId].landmark[rightId]
                 rightIris = StereoPoint(Point2D(camLIrisR.x, camLIrisR.y), Point2D(camRIrisR.x, camRIrisR.y))
                 rightIrisPx = self.utils.stereoLandmarkToPixelCoordinates(rightIris)
                 data.right.stereoPoints.append(rightIrisPx)

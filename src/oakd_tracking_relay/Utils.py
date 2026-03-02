@@ -123,3 +123,36 @@ class ProcessingUtils:
             
         self.prev_frame_time = current_frame_time
         return dataRate
+    
+    def getBestFace(self, resultsL, resultsR):
+        scores = []
+
+        for i, (fL, fR) in enumerate(zip(resultsL.multi_face_landmarks,
+                                        resultsR.multi_face_landmarks)):
+            scoreL = self.calculateFaceScore(fL)
+            scoreR = self.calculateFaceScore(fR)
+
+            # Stereo-Score = Mittelwert
+            scores.append((i, (scoreL + scoreR) / 2))
+
+        best_idx = max(scores, key=lambda x: x[1])[0]
+        return best_idx
+
+    def calculateFaceScore(self, face_landmarks, area_weight=0.4, center_weight=0.6):
+        xs = np.array([lm.x for lm in face_landmarks.landmark])
+        ys = np.array([lm.y for lm in face_landmarks.landmark])
+
+        # Bounding box (normiert)
+        xmin, xmax = xs.min(), xs.max()
+        ymin, ymax = ys.min(), ys.max()
+
+        area = (xmax - xmin) * (ymax - ymin)
+
+        # Center distance
+        cx = (xmin + xmax) / 2
+        cy = (ymin + ymax) / 2
+        center_dist = np.sqrt((cx - 0.5)**2 + (cy - 0.5)**2)
+
+        # Kombinierter Score (größer = besser)
+        score = area_weight * area - center_weight * center_dist
+        return score

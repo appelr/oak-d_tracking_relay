@@ -193,7 +193,7 @@ class EyeTracker(TrackerBase):
             leftIrisIndices = [468, 469, 470, 471, 472]
             rightIrisIndices = [473, 474, 475, 476, 477]
 
-            bestFaceId = self.utils.selectBestFace(resultsL, resultsR)
+            bestFaceId = self.utils.getBestFace(resultsL, resultsR)
 
             for leftId in leftIrisIndices:
                 camLIrisL = resultsL.multi_face_landmarks[bestFaceId].landmark[leftId]

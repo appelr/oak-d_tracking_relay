@@ -84,12 +84,18 @@ class ConfigurationUI:
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
 
         cv2.createTrackbar("ISO", self.window_name, self.config.iso, 1000, self._nothing)
-        cv2.setTrackbarMin("ISO", self.window_name, 400)
+        cv2.setTrackbarMin("ISO", self.window_name, 200)
+        cv2.setTrackbarMax("ISO", self.window_name, 1000)
 
-        cv2.createTrackbar("Exposure", self.window_name, self.config.exposure_us, 100, self._nothing)
-        cv2.setTrackbarMin("Exposure", self.window_name, 10)
 
-        cv2.createTrackbar("IR Laser", self.window_name, self.config.ir_laser_intensity_percent, 100, self._nothing)
+        cv2.createTrackbar("Exposure", self.window_name, self.config.exposure_us, 4000, self._nothing)
+        cv2.setTrackbarMin("Exposure", self.window_name, 500)
+        cv2.setTrackbarMax("Exposure", self.window_name, 9500)
+
+        cv2.createTrackbar("IR Laser", self.window_name, self.config.ir_laser_intensity_percent, 0, self._nothing)
+        cv2.setTrackbarMin("IR Laser", self.window_name, 0)
+        cv2.setTrackbarMax("IR Laser", self.window_name, 90)
+
         cv2.createTrackbar("Min. Detection", self.window_name, self.config.mp_min_detection_percent, 100, self._nothing)
         cv2.createTrackbar("Min. Tracking", self.window_name, self.config.mp_min_tracking_percent, 100, self._nothing)
 

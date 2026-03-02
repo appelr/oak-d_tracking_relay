@@ -138,7 +138,7 @@ class ProcessingUtils:
         best_idx = max(scores, key=lambda x: x[1])[0]
         return best_idx
 
-    def calculateFaceScore(self, face_landmarks, area_weight=0.4, center_weight=0.6):
+    def calculateFaceScore(self, face_landmarks, area_weight=0.5, center_weight=0.5):
         xs = np.array([lm.x for lm in face_landmarks.landmark])
         ys = np.array([lm.y for lm in face_landmarks.landmark])
 

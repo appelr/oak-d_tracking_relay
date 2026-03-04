@@ -48,7 +48,11 @@ def main():
                 print(dataRate)
                 irisLeft = utils.triangulatePoints_CV(eyeTracker.trackingData.left.aggregated)
                 irisRight = utils.triangulatePoints_CV(eyeTracker.trackingData.right.aggregated)
-                udpManager.send(irisLeft, irisRight, Point3D(), Point3D(), timeStamp)
+
+                # Check if distance is too far apart for eyes
+                dist = np.abs(irisLeft.z - irisRight.z)
+                if dist < 80:
+                    udpManager.send(irisLeft, irisRight, Point3D(), Point3D(), timeStamp)
 
             if state.showPreview:
                 if ui.shouldExit():

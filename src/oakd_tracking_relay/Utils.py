@@ -156,7 +156,8 @@ class ProcessingUtils:
         # Center distance
         cx = (xmin + xmax) / 2
         cy = (ymin + ymax) / 2
-        center_dist = np.sqrt((cx - 0.5)**2 + (cy - 0.5)**2)
+        # center_dist = np.sqrt((cx - 0.5)**2 + (cy - 0.5)**2)
+        center_dist = np.hypot(cx - 0.5, cy - 0.5)
 
         # Kombinierter Score (größer = besser)
         score = area_weight * area - center_weight * center_dist

@@ -62,7 +62,8 @@ class TrackerBase():
                 lastPoint = self.detectionBuffer[-1].aggregated.left
                 
                 # Distanz berechnen (hat sich das Auge bewegt?)
-                dist = np.sqrt((firstPoint.x - lastPoint.x)**2 + (firstPoint.y - lastPoint.y)**2)
+                # dist = np.sqrt((firstPoint.x - lastPoint.x)**2 + (firstPoint.y - lastPoint.y)**2)
+                dist = np.hypot(firstPoint.x - lastPoint.x, firstPoint.y - lastPoint.y)
                 
                 # Wenn stabil (< 10 Pixel Bewegung) -> START TRACKING
                 if dist < self.searchStabilityThreshold:

@@ -89,11 +89,11 @@ class ConfigurationUI:
         cv2.setTrackbarMax("CLAHE", self.window_name, 1)
 
         cv2.createTrackbar("ISO", self.window_name, self.config.iso, 1000, self._nothing)
-        cv2.setTrackbarMin("ISO", self.window_name, 200)
+        cv2.setTrackbarMin("ISO", self.window_name, 100)
         cv2.setTrackbarMax("ISO", self.window_name, 1000)
 
         cv2.createTrackbar("Exposure", self.window_name, self.config.exposure_us, 4000, self._nothing)
-        cv2.setTrackbarMin("Exposure", self.window_name, 500)
+        cv2.setTrackbarMin("Exposure", self.window_name, 50)
         cv2.setTrackbarMax("Exposure", self.window_name, 9500)
 
         cv2.createTrackbar("IR Laser", self.window_name, self.config.ir_laser_intensity_percent, 0, self._nothing)

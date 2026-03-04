@@ -163,11 +163,26 @@ class ProcessingUtils:
         score = area_weight * area - center_weight * center_dist
         return score
     
-    def cropFrame(self, frame, scale=0.5):
+    def cropFrame(self, frame, center: Point2D):
         h, w = frame.shape[:2]
+
+        if not center.valid():
+            scale = 0.6
+            cx = w // 2
+            cy = h // 2
+        else:
+            scale = 0.4
+            cx = int(center.x)
+            cy = int(center.y)
+
         ch, cw = int(h * scale), int(w * scale)
 
-        y0 = (h - ch) // 2
-        x0 = (w - cw) // 2
+        # linke obere Ecke berechnen
+        x0 = cx - cw // 2
+        y0 = cy - ch // 2
+
+        # Clamping damit wir nicht aus dem Bild laufen
+        x0 = max(0, min(x0, w - cw))
+        y0 = max(0, min(y0, h - ch))
 
         return frame[y0:y0+ch, x0:x0+cw], x0, y0

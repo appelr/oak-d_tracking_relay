@@ -182,8 +182,35 @@ class EyeTracker(TrackerBase):
             min_tracking_confidence=float(config.mp_min_tracking_percent/100))
 
     def detect(self, frameL, frameR) -> TrackingData:
-        cropL, offxL, offyL = self.utils.cropFrame(frameL)
-        cropR, offxR, offyR = self.utils.cropFrame(frameR)
+        centerL = Point2D()
+        centerR = Point2D()
+
+        if self.trackingData.valid():
+            print("Using center:", self.trackingData.aggregated.left.x,
+                           self.trackingData.aggregated.left.y)
+            centerL = self.trackingData.aggregated.left
+            centerR = self.trackingData.aggregated.right
+
+        # --- ROI Debug Window ---
+        debugFrameL = cv2.cvtColor(frameL.copy(), cv2.COLOR_GRAY2BGR)
+        cropL, offxL, offyL = self.utils.cropFrame(frameL, center=centerL)
+        h, w = cropL.shape[:2]
+        cv2.rectangle(debugFrameL, 
+                    (offxL, offyL), 
+                    (offxL + w, offyL + h), 
+                    (0,255,0), 
+                    2)
+        if centerL is not None:
+            cv2.circle(debugFrameL, 
+                    (int(centerL.x), int(centerL.y)), 
+                    5, 
+                    (0,0,255), 
+                    -1)
+        cv2.imshow("ROI Debug", debugFrameL)
+        # --- ROI Debug Window ---
+
+        cropL, offxL, offyL = self.utils.cropFrame(frameL, centerL)
+        cropR, offxR, offyR = self.utils.cropFrame(frameR, centerR)
 
         cropLRGB = cv2.cvtColor(cropL, cv2.COLOR_GRAY2RGB)
         cropRRGB = cv2.cvtColor(cropR, cv2.COLOR_GRAY2RGB)

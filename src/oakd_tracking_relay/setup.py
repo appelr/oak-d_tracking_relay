@@ -20,10 +20,6 @@ def main():
 
         eyeTracker = EyeTracker(utils, config)
 
-        clahe = cv2.createCLAHE(
-            clipLimit=2.0,
-            tileGridSize=(8, 8)
-        )
 
         while True:
             # Verarbeitung
@@ -37,9 +33,13 @@ def main():
             # frameL = cv2.rotate(frameL, cv2.ROTATE_180)
             # frameR = cv2.rotate(frameR, cv2.ROTATE_180)
             # frameL, frameR = frameR, frameL
-            claheL = clahe.apply(frameL)
-            claheR = clahe.apply(frameR)
-            frameL, frameR = utils.rectifyStereoFrame(claheL, claheR)
+
+            if config.clahe == 1:
+                frameL = utils.clahe.apply(frameL)
+                frameR = utils.clahe.apply(frameR)
+
+
+            frameL, frameR = utils.rectifyStereoFrame(frameL, frameR)
             
             eyeTracker.processFrame(frameL, frameR)
             dataRate = utils.getDataRate()

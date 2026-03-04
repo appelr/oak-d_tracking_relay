@@ -24,6 +24,7 @@ class Configuration:
     fps: int = 100
     exposure_us: int = 600
     iso: int = 200
+    clahe: int = 1
     ir_laser_intensity_percent: int = 100
     resolutionWidth: int = 640
     resolutionHeight: int = 400
@@ -83,10 +84,13 @@ class ConfigurationUI:
     def _create(self):
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
 
+        cv2.createTrackbar("CLAHE", self.window_name, self.config.clahe, 1, self._nothing)
+        cv2.setTrackbarMin("CLAHE", self.window_name, 0)
+        cv2.setTrackbarMax("CLAHE", self.window_name, 1)
+
         cv2.createTrackbar("ISO", self.window_name, self.config.iso, 1000, self._nothing)
         cv2.setTrackbarMin("ISO", self.window_name, 200)
         cv2.setTrackbarMax("ISO", self.window_name, 1000)
-
 
         cv2.createTrackbar("Exposure", self.window_name, self.config.exposure_us, 4000, self._nothing)
         cv2.setTrackbarMin("Exposure", self.window_name, 500)
@@ -120,6 +124,7 @@ class ConfigurationUI:
         new_values = {
             "iso": cv2.getTrackbarPos("ISO", self.window_name),
             "exposure_us": cv2.getTrackbarPos("Exposure", self.window_name),
+            "clahe": cv2.getTrackbarPos("CLAHE", self.window_name),
             "ir_laser_intensity_percent": cv2.getTrackbarPos("IR Laser", self.window_name),
             "mp_min_detection_percent": cv2.getTrackbarPos("Min. Detection", self.window_name),
             "mp_min_tracking_percent": cv2.getTrackbarPos("Min. Tracking", self.window_name),

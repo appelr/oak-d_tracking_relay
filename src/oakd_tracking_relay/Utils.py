@@ -63,6 +63,11 @@ class ProcessingUtils:
             cv2.CV_16SC2
         )
 
+        self.clahe = cv2.createCLAHE(
+                    clipLimit=2.0,
+                    tileGridSize=(8, 8)
+                )
+
         # Data rate calculation
         self.prev_frame_time = 0.0
         self.smoothed_dt = 0.0

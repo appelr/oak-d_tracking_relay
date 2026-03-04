@@ -186,8 +186,6 @@ class EyeTracker(TrackerBase):
         centerR = Point2D()
 
         if self.trackingData.valid():
-            print("Using center:", self.trackingData.aggregated.left.x,
-                           self.trackingData.aggregated.left.y)
             centerL = self.trackingData.aggregated.left
             centerR = self.trackingData.aggregated.right
 
@@ -231,16 +229,14 @@ class EyeTracker(TrackerBase):
 
             # linkes Auge
             for idx in leftIrisIndices:
-                left  = Point2D(offxL + landmarksL.landmark[idx].x * cropL.shape[1],offyL + landmarksL.landmark[idx].y * cropL.shape[0])
-                right = Point2D(offxR + landmarksR.landmark[idx].x * cropR.shape[1],offyR + landmarksR.landmark[idx].y * cropR.shape[0])
+                left  = Point2D(offxL + landmarksL.landmark[idx].x * cropL.shape[1], offyL + landmarksL.landmark[idx].y * cropL.shape[0])
+                right = Point2D(offxR + landmarksR.landmark[idx].x * cropR.shape[1], offyR + landmarksR.landmark[idx].y * cropR.shape[0])
                 data.left.stereoPoints.append(StereoPoint(left, right))
 
             # rechtes Auge
             for idx in rightIrisIndices:
-                left  = Point2D(offxL + landmarksL.landmark[idx].x * cropL.shape[1],
-                                    offyL + landmarksL.landmark[idx].y * cropL.shape[0])
-                right = Point2D(offxR + landmarksR.landmark[idx].x * cropR.shape[1],
-                                    offyR + landmarksR.landmark[idx].y * cropR.shape[0])
+                left  = Point2D(offxL + landmarksL.landmark[idx].x * cropL.shape[1], offyL + landmarksL.landmark[idx].y * cropL.shape[0])
+                right = Point2D(offxR + landmarksR.landmark[idx].x * cropR.shape[1], offyR + landmarksR.landmark[idx].y * cropR.shape[0])
                 data.right.stereoPoints.append(StereoPoint(left, right))
 
             if data.valid():
@@ -249,14 +245,50 @@ class EyeTracker(TrackerBase):
         return data
 
 
-class HandTracker(TrackerBase):
-    def __init__(self, utils, config):
-        super().__init__(utils, config)
+class HandTracker():
+    def __init__(self, config):
         self.model = mp.solutions.hands.Hands( # type: ignore[attr-defined]
             max_num_hands=2,
             model_complexity=0,
             min_detection_confidence=float(config.mp_min_detection_percent/100),
             min_tracking_confidence=float(config.mp_min_tracking_percent/100))
         
-    def detect(self, frameL, frameR) -> TrackingData:
-        return TrackingData()
+        self.config = config
+        self.trackingData = TrackingData()
+        
+    def detect(self, frameL, frameR):
+        frameL = cv2.cvtColor(frameL, cv2.COLOR_GRAY2RGB)
+        frameR = cv2.cvtColor(frameR, cv2.COLOR_GRAY2RGB)
+
+        resultsL = self.model.process(frameL)
+        resultsR = self.model.process(frameR)
+
+        data = TrackingData(targetType=TargetType.HANDS)
+
+        if resultsL.multi_hand_landmarks and resultsR.multi_hand_landmarks:
+            handsCamR = {}
+            for rLandmakrs, handedness in zip(resultsR.multi_hand_landmarks, resultsR.multi_handedness):
+                handLabel = handedness.classification[0].label
+                handCenter = rLandmakrs.landmark[9]
+                handsCamR[handLabel] = handCenter
+
+            for lLandmarks, handedness in zip(resultsL.multi_hand_landmarks, resultsL.multi_handedness):
+                handLabel = handedness.classification[0].label
+                
+                if handLabel in handsCamR:
+                    handCenterCamL = lLandmarks.landmark[9]
+                    handCenterCamR = handsCamR[handLabel]
+                    pointLeft = Point2D(handCenterCamL.x * self.config.resolutionWidth, handCenterCamL.y * self.config.resolutionHeight)
+                    pointRight = Point2D(handCenterCamR.x * self.config.resolutionWidth, handCenterCamR.y * self.config.resolutionHeight)
+                    stereoPoint = StereoPoint(pointLeft, pointRight)
+
+                    # Swap hands for ego perspective
+                    if handLabel == "Right":
+                        data.left.stereoPoints.append(stereoPoint)
+                    if handLabel == "Left":
+                        data.right.stereoPoints.append(stereoPoint)
+
+            if data.valid():
+                data.aggregate_median()
+
+        self.trackingData = data

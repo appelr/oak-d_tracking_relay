@@ -142,13 +142,17 @@ class ConfigurationUI:
             self.state.update_trigger = False
             self.config.save()
 
-    def drawTrackingData(self, trackingData: TrackingData, dataRate):
+    def drawTrackingData(self, trackingData: TrackingData):
         if trackingData.valid():
             leftPointX, leftPointY = int(trackingData.left.aggregated.left.x), int(trackingData.left.aggregated.left.y)
             rightPointX, rightPointY = int(trackingData.right.aggregated.left.x), int(trackingData.right.aggregated.left.y)
             if self.displayFrame is not None:
                 cv2.circle(self.displayFrame, (leftPointX, leftPointY), 5, (0, 255, 255), -1)
                 cv2.circle(self.displayFrame, (rightPointX, rightPointY), 5, (0, 255, 0), -1)
-                cv2.putText(self.displayFrame, f"FPS: {int(dataRate)}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+    def drawDataRate(self, dataRate: float):
+        if self.displayFrame is not None:
+            cv2.putText(self.displayFrame, f"FPS: {int(dataRate)}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
 
         

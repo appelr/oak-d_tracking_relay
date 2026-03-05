@@ -11,11 +11,11 @@ class UDP:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.config = config
     
-    def send(self, irisL: Point3D, irisR: Point3D, handL: Point3D, handR: Point3D, timeStamp: float):
+    def sendEyes(self, irisL: Point3D, irisR: Point3D, timeStamp: float):
         if irisL.valid() and irisR.valid(): 
-            head = {
+            eyes = {
                 "ts": timeStamp,
-                "head": {
+                "eyes": {
                     "left_iris": {
                         "x": irisL.x,
                         "y": irisL.y,
@@ -28,8 +28,9 @@ class UDP:
                     }
                 }
             }
-            self.sendInternal(head, self.config.udp_port_head)
+            self.sendInternal(eyes, self.config.udp_port_eyes)
 
+    def sendHands(self, handL: Point3D, handR: Point3D, timeStamp: float):
         if handL.valid() or handR.valid():
             hands = {"ts": timeStamp, "hands": {}}
 
@@ -53,7 +54,6 @@ class UDP:
         try:
             json_bytes = orjson.dumps(payload, option=orjson.OPT_SERIALIZE_NUMPY)
             self.sock.sendto(json_bytes, (self.config.udp_ip, port))
-            # print(json_bytes, flush=True)
         except Exception as e:
             print(f"UDP Error (Target {port}): {e}")
 

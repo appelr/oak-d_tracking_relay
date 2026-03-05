@@ -54,19 +54,23 @@ def main():
 
             if eyeTracker.currentState == TrackerState.TRACKING and eyeTracker.trackingData.valid():
                 print(dataRate)
-                irisLeft = utils.triangulatePoints_CV(eyeTracker.trackingData.left.aggregated)
-                irisRight = utils.triangulatePoints_CV(eyeTracker.trackingData.right.aggregated)
+                irisLeftStereo = eyeTracker.trackingData.left.aggregated
+                irisRightStereo = eyeTracker.trackingData.right.aggregated
+                irisLeft3D = utils.triangulatePoints_CV(irisLeftStereo)
+                irisRight3D = utils.triangulatePoints_CV(irisRightStereo)
 
                 # Check if distance is too far apart for eyes
-                dist = np.abs(irisLeft.z - irisRight.z)
+                dist = np.abs(irisLeft3D.z - irisRight3D.z)
                 if dist < 80:
-                    udpManager.send(irisLeft, irisRight, Point3D(), Point3D(), timeStamp)
+                    udpManager.sendEyes(irisLeft3D, irisRight3D, timeStamp)
 
             if handTracker.trackingData.valid():
-                handLeft = utils.triangulatePoints_CV(handTracker.trackingData.left.aggregated)
-                handRight = utils.triangulatePoints_CV(handTracker.trackingData.right.aggregated)
+                handLeftStereo = handTracker.trackingData.left.aggregated
+                handRightStereo = handTracker.trackingData.right.aggregated
+                handLeft3D = utils.triangulatePoints_CV(handLeftStereo)
+                handRight3D = utils.triangulatePoints_CV(handRightStereo)
 
-                udpManager.send(Point3D(), Point3D(), handLeft, handRight, timeStamp)
+                udpManager.sendHands(handLeft3D, handRight3D, timeStamp)
 
             if state.showPreview:
                 if ui.shouldExit():

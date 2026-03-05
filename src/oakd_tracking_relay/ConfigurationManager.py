@@ -17,7 +17,7 @@ class RuntimeState:
 class Configuration:
     # Netzwerk
     udp_ip: str = "127.0.0.1"
-    udp_port_head: int = 5005
+    udp_port_eyes: int = 5005
     udp_port_hands: int = 5006
     
     # Kamera

@@ -35,16 +35,9 @@ class Point3D:
 class StereoPoint:
     left: Point2D = field(default_factory=Point2D)
     right: Point2D = field(default_factory=Point2D)
-    #position_3d: Point3D = field(default_factory=Point3D)
-
-    def valid_2d(self) -> bool:
-        return self.left.valid() and self.right.valid()
-
-    # def valid_3d(self) -> bool:
-    #     return self.position_3d.valid()
 
     def valid(self) -> bool:
-        return self.valid_2d() #or self.valid_3d()
+        return self.left.valid() and self.right.valid()
     
 @dataclass
 class StereoPointCluster:

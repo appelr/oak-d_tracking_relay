@@ -142,6 +142,29 @@ class ConfigurationUI:
             self.state.update_trigger = False
             self.config.save()
 
+    def drawHandQuadrants(self, hand_ol, hand_ul, hand_or, hand_ur):
+        
+        if self.displayFrame is not None:
+
+            # 3. Eine leere Folie (Overlay) für die halbtransparenten Farben erstellen
+            overlay = self.displayFrame.copy()
+
+            h, w = self.config.resolutionHeight, self.config.resolutionWidth
+            half_w, half_h = int(w / 2), int(h / 2)
+
+            # 4. Die Quadranten färben (BGR-Farbcode: Blau, Grün, Rot)
+            if hand_ol: 
+                cv2.rectangle(overlay, (0, 0), (half_w, half_h), (0, 255, 0), -1)   # Grün
+            if hand_ul: 
+                cv2.rectangle(overlay, (0, half_h), (half_w, h), (255, 0, 0), -1)   # Blau
+            if hand_or: 
+                cv2.rectangle(overlay, (half_w, 0), (w, half_h), (0, 0, 255), -1)   # Rot
+            if hand_ur: 
+                cv2.rectangle(overlay, (half_w, half_h), (w, h), (0, 255, 255), -1) # Gelb
+
+            # 5. Overlay und Originalbild mischen (30% Farb-Deckkraft, 70% Originalbild)
+            cv2.addWeighted(overlay, 0.3, self.displayFrame, 0.7, 0, self.displayFrame)
+
     def drawTrackingData(self, trackingData: TrackingData):
         if trackingData.valid():
             leftPointX, leftPointY = int(trackingData.left.aggregated.left.x), int(trackingData.left.aggregated.left.y)

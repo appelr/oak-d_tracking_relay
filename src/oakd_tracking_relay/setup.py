@@ -1,5 +1,4 @@
 import time
-import cv2
 import concurrent.futures
 
 from oakd_tracking_relay.ConfigurationManager import Configuration, ConfigurationUI, RuntimeState
@@ -20,10 +19,11 @@ def main():
         ui = ConfigurationUI(camera, config, state)
 
         eyeTracker = EyeTracker(utils, config)
-        handTracker = HandTracker(utils, config)
+        handTracker = HandTracker(config)
 
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         hand_task = None
+        hand_ol, hand_ul, hand_or, hand_ur = False, False, False, False
 
         while True:
             # Verarbeitung
@@ -48,12 +48,19 @@ def main():
             eyeTracker.processFrame(frameL, frameR)
 
             if hand_task is None or hand_task.done():
-                hand_task = executor.submit(handTracker.processFrame, frameL.copy(), frameR.copy())
+                
+                if hand_task is not None:
+                    try:
+                        hand_ol, hand_ul, hand_or, hand_ur = hand_task.result()
+                    except Exception as e:
+                        print(f"Fehler im Hand-Thread: {e}")
+
+                hand_task = executor.submit(handTracker.check_presence, frameL.copy())
 
             dataRate = utils.getDataRate()
 
             if eyeTracker.currentState == TrackerState.TRACKING and eyeTracker.trackingData.valid():
-                print(dataRate)
+                #print(dataRate)
                 irisLeftStereo = eyeTracker.trackingData.left.aggregated
                 irisRightStereo = eyeTracker.trackingData.right.aggregated
                 irisLeft3D = utils.triangulatePoints_CV(irisLeftStereo)
@@ -64,14 +71,9 @@ def main():
                 if dist < 80:
                     udpManager.sendEyes(irisLeft3D, irisRight3D, timeStamp)
 
-            if handTracker.trackingData.valid():
-                handLeftStereo = handTracker.trackingData.left.aggregated
-                handRightStereo = handTracker.trackingData.right.aggregated
-                handLeft3D = utils.triangulatePoints_CV(handLeftStereo)
-                handRight3D = utils.triangulatePoints_CV(handRightStereo)
-
-                udpManager.sendHands(handLeft3D, handRight3D, timeStamp)
-
+            if hand_ol or hand_ul or hand_or or hand_ur:
+                udpManager.sendHands(hand_ol, hand_ul, hand_or, hand_ur, timeStamp)
+            
             if state.showPreview:
                 if ui.shouldExit():
                     ui.exit()
@@ -80,7 +82,7 @@ def main():
                     ui.updateConfigIfChanged()
                     ui.setDisplayFrame(frameL)
                     ui.drawTrackingData(eyeTracker.trackingData)
-                    ui.drawTrackingData(handTracker.trackingData)
+                    ui.drawHandQuadrants(hand_ol, hand_ul, hand_or, hand_ur)
                     ui.drawDataRate(dataRate)
                     ui.show()
             

@@ -30,24 +30,14 @@ class UDP:
             }
             self.sendInternal(eyes, self.config.udp_port_eyes)
 
-    def sendHands(self, handL: Point3D, handR: Point3D, timeStamp: float):
-        if handL.valid() or handR.valid():
+    def sendHands(self, hand_ol: bool, hand_ul: bool, hand_or: bool, hand_ur: bool, timeStamp: float):
             hands = {"ts": timeStamp, "hands": {}}
-
-            if handL.valid():
-                hands["hands"]["left_hand"] = {
-                    "x": handL.x,
-                    "y": handL.y,
-                    "z": handL.z
-                }
-                
-            if handR.valid():
-                hands["hands"]["right_hand"] = {
-                    "x": handR.x,
-                    "y": handR.y,
-                    "z": handR.z
-                }
-
+            hands["hands"]["Left Up"] = hand_ol
+            hands["hands"]["Left Down"] = hand_ul
+            hands["hands"]["Right Up"] = hand_or
+            hands["hands"]["Right Down"] = hand_ur
+            
+            print(hands)
             self.sendInternal(hands, self.config.udp_port_hands)
 
     def sendInternal(self, payload: Dict, port: int):

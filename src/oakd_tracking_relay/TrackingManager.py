@@ -17,30 +17,24 @@ class TrackerBase():
             self.model = None
             self.currentState = TrackerState.SEARCHING
             self.trackingData = TrackingData()
-            self.prevFrameL = None
-            self.prevFrameR = None
             self.trackingConfidence = 0
             self.frameCounter = 0
             self.detectionBuffer = []
             self.detectionBufferMaxSize = 2
-            self.minTrackingPoints = 2
             self.confidenceInit = 15
             self.confidenceMin = 0
 
             # Thresholds
-            self.maxJump = 35
-            self.maxDispDelta = 10
             self.searchStabilityThreshold = 20
             self.recheckCorrectionThreshold = 1.5
             self.recheckInterval = 15
-            self.opticalFlowParams = dict(winSize=(8, 8), maxLevel=5,
-                                        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 20, 0.03))
             
-
     def detect(self, frameL, frameR) -> TrackingData:
         raise NotImplementedError("Please Implement this method")
     
-
+    def track(self, frameL, frameR) -> TrackingData:
+        raise NotImplementedError("Please Implement this method")
+    
     def processFrame(self, frameL, frameR):
         self.frameCounter += 1
 
@@ -49,7 +43,6 @@ class TrackerBase():
             
         elif self.currentState == TrackerState.TRACKING:
             self.track(frameL, frameR)
-
 
     def search(self, frameL, frameR):
         detectedData = self.detect(frameL, frameR)
@@ -68,7 +61,6 @@ class TrackerBase():
                 # Wenn stabil (< 10 Pixel Bewegung) -> START TRACKING
                 if dist < self.searchStabilityThreshold:
                     self.trackingData = self.detectionBuffer[-1]
-                    self.prevFrameL, self.prevFrameR = frameL.copy(), frameR.copy()
                     self.trackingConfidence = self.confidenceInit
                     self.detectionBuffer = []
                     self.currentState = TrackerState.TRACKING
@@ -77,6 +69,34 @@ class TrackerBase():
         else:
             self.detectionBuffer = []
 
+    def _decrease_confidence(self, amount=1):
+        self.trackingConfidence -= amount
+
+        if self.trackingConfidence <= self.confidenceMin:
+            self.trackingData = TrackingData()
+            self.detectionBuffer = []
+            self.currentState = TrackerState.SEARCHING
+
+class EyeTracker(TrackerBase):
+    def __init__(self, utils, config):
+        super().__init__(utils, config)
+        self.model = mp.solutions.face_mesh.FaceMesh( # type: ignore[attr-defined]
+            max_num_faces=4, 
+            refine_landmarks=True,
+            min_detection_confidence=float(config.mp_min_detection_percent)/100, 
+            min_tracking_confidence=float(config.mp_min_tracking_percent/100))
+        self.prevFrameL = None
+        self.PrevFrameR = None
+        self.maxJump = 35
+        self.maxDispDelta = 10
+        self.minTrackingPoints = 2
+        self.opticalFlowParams = dict(winSize=(8, 8), maxLevel=5,
+                                    criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 20, 0.03))
+    
+    def search(self, frameL, frameR):
+        super().search(frameL, frameR)
+        if self.currentState == TrackerState.TRACKING:
+            self.prevFrameL, self.prevFrameR = frameL.copy(), frameR.copy()
 
     def track(self, frameL, frameR): 
         leftPointsLeftCam = [p.left.as_np() for p in self.trackingData.left.stereoPoints]
@@ -138,7 +158,6 @@ class TrackerBase():
         self.trackingConfidence = min(self.trackingConfidence + 1, self.confidenceInit)
     
         # RECHECK
-        # if self.currentState == TrackerState.TRACKING and self.frameCounter % self.recheckInterval == 0:
         if self.frameCounter % self.recheckInterval == 0 or len(self.detectionBuffer) > 0:
             recheckData = self.detect(frameL, frameR)
 
@@ -163,23 +182,6 @@ class TrackerBase():
             else:
                 self.detectionBuffer = []
 
-
-    def _decrease_confidence(self, amount=1):
-        self.trackingConfidence -= amount
-
-        if self.trackingConfidence <= self.confidenceMin:
-            self.trackingData = TrackingData()
-            self.detectionBuffer = []
-            self.currentState = TrackerState.SEARCHING
-
-class EyeTracker(TrackerBase):
-    def __init__(self, utils, config):
-        super().__init__(utils, config)
-        self.model = mp.solutions.face_mesh.FaceMesh( # type: ignore[attr-defined]
-            max_num_faces=4, 
-            refine_landmarks=True,
-            min_detection_confidence=float(config.mp_min_detection_percent)/100, 
-            min_tracking_confidence=float(config.mp_min_tracking_percent/100))
 
     def detect(self, frameL, frameR) -> TrackingData:
         centerL = Point2D()
@@ -245,10 +247,11 @@ class EyeTracker(TrackerBase):
         return data
 
 
-class HandTracker():
-    def __init__(self, config):
+class HandTracker(TrackerBase):
+    def __init__(self, utils, config):
+        super().__init__(utils, config)
         self.model = mp.solutions.hands.Hands( # type: ignore[attr-defined]
-            max_num_hands=2,
+            max_num_hands=4,
             model_complexity=0,
             min_detection_confidence=float(config.mp_min_detection_percent/100),
             min_tracking_confidence=float(config.mp_min_tracking_percent/100))
@@ -256,6 +259,18 @@ class HandTracker():
         self.config = config
         self.trackingData = TrackingData()
         
+    def track(self, frameL, frameR):
+        data = self.detect(frameL, frameR)
+        
+        if data.valid():
+            self.trackingData = data
+            self.trackingConfidence = min(self.trackingConfidence + 1, self.confidenceInit)
+            
+        else:
+            self._decrease_confidence(amount=2)
+            
+        return data
+
     def detect(self, frameL, frameR):
         frameL = cv2.cvtColor(frameL, cv2.COLOR_GRAY2RGB)
         frameR = cv2.cvtColor(frameR, cv2.COLOR_GRAY2RGB)
@@ -291,4 +306,4 @@ class HandTracker():
             if data.valid():
                 data.aggregate_median()
 
-        self.trackingData = data
+        return data

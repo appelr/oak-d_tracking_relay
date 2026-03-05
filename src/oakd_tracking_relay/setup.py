@@ -20,7 +20,7 @@ def main():
         ui = ConfigurationUI(camera, config, state)
 
         eyeTracker = EyeTracker(utils, config)
-        handTracker = HandTracker(config)
+        handTracker = HandTracker(utils, config)
 
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         hand_task = None
@@ -48,7 +48,7 @@ def main():
             eyeTracker.processFrame(frameL, frameR)
 
             if hand_task is None or hand_task.done():
-                hand_task = executor.submit(handTracker.detect, frameL.copy(), frameR.copy())
+                hand_task = executor.submit(handTracker.processFrame, frameL.copy(), frameR.copy())
 
             dataRate = utils.getDataRate()
 

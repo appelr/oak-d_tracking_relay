@@ -3,7 +3,7 @@ import cv2
 import os
 from dataclasses import dataclass, asdict
 
-from oakd_tracking_relay.TrackingDTO import *
+from oakd_tracking_relay.tracking_dto import *
 
 @dataclass
 class RuntimeState:

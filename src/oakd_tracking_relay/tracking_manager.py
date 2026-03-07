@@ -3,7 +3,7 @@ import numpy as np
 import mediapipe as mp
 from enum import Enum, auto
 
-from oakd_tracking_relay.TrackingDTO import *
+from oakd_tracking_relay.tracking_dto import *
 
 class TrackerState(Enum):
     SEARCHING = auto()

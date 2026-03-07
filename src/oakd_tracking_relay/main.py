@@ -1,12 +1,12 @@
 import time
 import concurrent.futures
 
-from oakd_tracking_relay.ConfigurationManager import Configuration, ConfigurationUI, RuntimeState
-from oakd_tracking_relay.CameraManager import OakD
+from oakd_tracking_relay.configuration_manager import Configuration, ConfigurationUI, RuntimeState
+from oakd_tracking_relay.camera_manager import OakD
 from oakd_tracking_relay.Utils import ProcessingUtils
-from oakd_tracking_relay.TrackingManager import *
-from oakd_tracking_relay.TrackingDTO import *
-from oakd_tracking_relay.UDPManager import UDP
+from oakd_tracking_relay.tracking_manager import *
+from oakd_tracking_relay.tracking_dto import *
+from oakd_tracking_relay.udp_manager import UDP
 
 def main():
     config = Configuration.load("config.json")

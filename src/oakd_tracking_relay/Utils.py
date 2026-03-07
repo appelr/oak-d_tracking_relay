@@ -3,7 +3,7 @@ import time
 import numpy as np
 import depthai as dai
 
-from oakd_tracking_relay.TrackingDTO import *
+from oakd_tracking_relay.tracking_dto import *
 
 class ProcessingUtils:
     def __init__(self, camera, config):

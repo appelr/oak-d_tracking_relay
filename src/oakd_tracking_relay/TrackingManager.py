@@ -21,8 +21,8 @@ class EyeTracker:
         self.model = mp.solutions.face_mesh.FaceMesh(
             max_num_faces=4, 
             refine_landmarks=True,
-            min_detection_confidence=float(config.confidence_percent)/100, 
-            min_tracking_confidence=float(config.confidence_percent/100)
+            static_image_mode=True, # Tracking-infos ignorieren, da wir Optical Flow nutzen
+            min_detection_confidence=float(config.confidence_percent)/100
         )
         
         # State & Logik

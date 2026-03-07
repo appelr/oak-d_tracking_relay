@@ -1,5 +1,5 @@
 # Oak-D Tracking Relay
-Low latency iris and hand tracking for stereoscopic Unity XR applications - Part of a group task @ TH Köln
+Low latency Iris and Hand tracking for stereoscopic Unity XR applications - Part of a group task @ TH Köln
 
 ## Setup
 - Create Python Environment (Needs Python 3.12.x)
@@ -7,5 +7,5 @@ Low latency iris and hand tracking for stereoscopic Unity XR applications - Part
 - Install dependencies: `pip install -e .`
 
 ## Run Config and Headless mode
-- use `start-tracking --setup` for camera- and tracking configuration or just edit `config.json`
-- use `start-tracking` for headless mode (ensure configuration suits your environment)
+- use `start-tracking` for Camera and Tracking configuration (or just edit `config.json`)
+- press `q` to close configuration window and start Tracking with higher data rate

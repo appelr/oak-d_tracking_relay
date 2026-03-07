@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from oakd_tracking_relay.configuration_manager import Configuration, RuntimeState
 
-class OakD:
+class OakDPro:
     def __init__(self, config: Configuration, state: RuntimeState):
         self.config = config
         self.state = state

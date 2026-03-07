@@ -2,7 +2,7 @@ import time
 import concurrent.futures
 
 from oakd_tracking_relay.configuration_manager import Configuration, ConfigurationUI, RuntimeState
-from oakd_tracking_relay.camera_manager import OakD
+from oakd_tracking_relay.camera_manager import OakDPro
 from oakd_tracking_relay.Utils import ProcessingUtils
 from oakd_tracking_relay.tracking_manager import *
 from oakd_tracking_relay.tracking_dto import *
@@ -13,7 +13,7 @@ def main():
     udpManager = UDP(config)
     state = RuntimeState()
 
-    with OakD(config, state) as camera:
+    with OakDPro(config, state) as camera:
         utils = ProcessingUtils(camera=camera, config=config)
         ui = ConfigurationUI(camera, config, state)
 

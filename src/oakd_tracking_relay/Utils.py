@@ -1,11 +1,9 @@
 import cv2
 import time
-
-import mediapipe as mp
 import numpy as np
 import depthai as dai
 
-from .TrackingDTO import *
+from oakd_tracking_relay.TrackingDTO import *
 
 class ProcessingUtils:
     def __init__(self, camera, config):

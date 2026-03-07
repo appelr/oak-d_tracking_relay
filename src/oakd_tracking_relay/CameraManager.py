@@ -1,7 +1,8 @@
-import depthai as dai
 import time
+import depthai as dai
 from datetime import timedelta
-from .ConfigurationManager import Configuration, RuntimeState
+
+from oakd_tracking_relay.ConfigurationManager import Configuration, RuntimeState
 
 class OakD:
     def __init__(self, config: Configuration, state: RuntimeState):

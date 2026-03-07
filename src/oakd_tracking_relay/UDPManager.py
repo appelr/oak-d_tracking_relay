@@ -1,10 +1,9 @@
 import socket
 import orjson
-
 from typing import Dict
 
-from .ConfigurationManager import Configuration
-from .TrackingDTO import *
+from oakd_tracking_relay.ConfigurationManager import Configuration
+from oakd_tracking_relay.TrackingDTO import *
 
 class UDP:
     def __init__(self, config: Configuration):

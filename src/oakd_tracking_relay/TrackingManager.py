@@ -2,7 +2,8 @@ import cv2
 import numpy as np
 import mediapipe as mp
 from enum import Enum, auto
-from .TrackingDTO import *
+
+from oakd_tracking_relay.TrackingDTO import *
 
 class TrackerState(Enum):
     SEARCHING = auto()

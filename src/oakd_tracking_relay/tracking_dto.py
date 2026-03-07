@@ -3,9 +3,8 @@ from typing import List
 from enum import Enum, auto
 from dataclasses import dataclass, field
 
-
-class TargetType(Enum):
-    HEAD = auto()
+class TrackedType(Enum):
+    EYES = auto()
     HANDS = auto()
 
 @dataclass
@@ -41,22 +40,22 @@ class StereoPoint:
     
 @dataclass
 class StereoPointCluster:
-    stereoPoints: List[StereoPoint] = field(default_factory=list)
+    stereo_points: List[StereoPoint] = field(default_factory=list)
     aggregated: StereoPoint = field(default_factory=StereoPoint)
 
     def valid(self) -> bool:
-        return len(self.stereoPoints) > 0
+        return len(self.stereo_points) > 0
 
     def aggregate_median(self):
-        left_pts = [p.left.as_np() for p in self.stereoPoints if p.left.valid()]
-        right_pts = [p.right.as_np() for p in self.stereoPoints if p.right.valid()]
+        left_points = [p.left.as_np() for p in self.stereo_points if p.left.valid()]
+        right_points = [p.right.as_np() for p in self.stereo_points if p.right.valid()]
 
-        if left_pts:
-            median = np.median(left_pts, axis=0)
+        if left_points:
+            median = np.median(left_points, axis=0)
             self.aggregated.left = Point2D(*median)
 
-        if right_pts:
-            median = np.median(right_pts, axis=0)
+        if right_points:
+            median = np.median(right_points, axis=0)
             self.aggregated.right = Point2D(*median)
 
 @dataclass
@@ -64,35 +63,35 @@ class TrackingData:
     left: StereoPointCluster = field(default_factory=StereoPointCluster)
     right: StereoPointCluster = field(default_factory=StereoPointCluster)
     aggregated: StereoPoint = field(default_factory=StereoPoint)
-    targetType: TargetType = TargetType.HEAD
+    tracked_type: TrackedType = TrackedType.EYES
+
     def valid(self) -> bool: 
-            if self.targetType == TargetType.HEAD:
+            # Für Augen müssen beide vorhanden sein, bei Händen reicht eine
+            if self.tracked_type == TrackedType.EYES:
                 return self.left.valid() and self.right.valid()
-            elif self.targetType == TargetType.HANDS:
+            elif self.tracked_type == TrackedType.HANDS:
                 return self.left.valid() or self.right.valid()
             
             return False
     
     def aggregate_median(self):
-        left_cam_pts = []
-        right_cam_pts = []
+        left_cam_points = []
+        right_cam_points = []
 
         if self.left.valid():
             self.left.aggregate_median()
-            left_cam_pts.append(self.left.aggregated.left.as_np())
-            right_cam_pts.append(self.left.aggregated.right.as_np())
+            left_cam_points.append(self.left.aggregated.left.as_np())
+            right_cam_points.append(self.left.aggregated.right.as_np())
 
         if self.right.valid():
             self.right.aggregate_median()
-            left_cam_pts.append(self.right.aggregated.left.as_np())
-            right_cam_pts.append(self.right.aggregated.right.as_np())
+            left_cam_points.append(self.right.aggregated.left.as_np())
+            right_cam_points.append(self.right.aggregated.right.as_np())
 
-        # 3. Mittelpunkt für die LINKE Kamera berechnen
-        if left_cam_pts:
-            medianL = np.median(left_cam_pts, axis=0)
-            self.aggregated.left = Point2D(*medianL)
+        if left_cam_points:
+            median_left = np.median(left_cam_points, axis=0)
+            self.aggregated.left = Point2D(*median_left)
 
-        # 4. Mittelpunkt für die RECHTE Kamera berechnen
-        if right_cam_pts:
-            medianR = np.median(right_cam_pts, axis=0)
-            self.aggregated.right = Point2D(*medianR)
+        if right_cam_points:
+            median_right = np.median(right_cam_points, axis=0)
+            self.aggregated.right = Point2D(*median_right)

@@ -5,43 +5,42 @@ from typing import Dict
 from oakd_tracking_relay.configuration_manager import Configuration
 from oakd_tracking_relay.tracking_dto import *
 
-class UDP:
+class UDPSender:
     def __init__(self, config: Configuration):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.config = config
     
-    def sendEyes(self, irisL: Point3D, irisR: Point3D, timeStamp: float):
-        if irisL.valid() and irisR.valid(): 
-            eyes = {
-                "ts": timeStamp,
+    def send_eyes(self, iris_left: Point3D, iris_right: Point3D, timestamp: float):
+        if iris_left.valid() and iris_right.valid(): 
+            data = {
+                "ts": timestamp,
                 "eyes": {
                     "left_iris": {
-                        "x": irisL.x,
-                        "y": irisL.y,
-                        "z": irisL.z
+                        "x": iris_left.x,
+                        "y": iris_left.y,
+                        "z": iris_left.z
                     },
                     "right_iris": {
-                        "x": irisR.x,
-                        "y": irisR.y,
-                        "z": irisR.z
+                        "x": iris_right.x,
+                        "y": iris_right.y,
+                        "z": iris_right.z
                     }
                 }
             }
-            self.sendInternal(eyes, self.config.udp_port_eyes)
+            self._send_data(data=data, port=self.config.udp_port_eyes)
 
-    def sendHands(self, hand_ol: bool, hand_ul: bool, hand_or: bool, hand_ur: bool, timeStamp: float):
-            hands = {"ts": timeStamp, "hands": {}}
-            hands["hands"]["Left Up"] = hand_ol
-            hands["hands"]["Left Down"] = hand_ul
-            hands["hands"]["Right Up"] = hand_or
-            hands["hands"]["Right Down"] = hand_ur
+    def send_hands(self, upper_left: bool, lower_left: bool, upper_right: bool, lower_right: bool, timestamp: float):
+            data = {"ts": timestamp, "hands": {}}
+            data["hands"]["Left Up"] = upper_left
+            data["hands"]["Left Down"] = lower_left
+            data["hands"]["Right Up"] = upper_right
+            data["hands"]["Right Down"] = lower_right
             
-            print(hands)
-            self.sendInternal(hands, self.config.udp_port_hands)
+            self._send_data(data=data, port=self.config.udp_port_hands)
 
-    def sendInternal(self, payload: Dict, port: int):
+    def _send_data(self, data: Dict, port: int):
         try:
-            json_bytes = orjson.dumps(payload, option=orjson.OPT_SERIALIZE_NUMPY)
+            json_bytes = orjson.dumps(data, option=orjson.OPT_SERIALIZE_NUMPY)
             self.sock.sendto(json_bytes, (self.config.udp_ip, port))
         except Exception as e:
             print(f"UDP Error (Target {port}): {e}")

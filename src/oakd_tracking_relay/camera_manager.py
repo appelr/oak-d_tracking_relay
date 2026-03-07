@@ -2,101 +2,99 @@ import time
 import depthai as dai
 from datetime import timedelta
 
-from oakd_tracking_relay.configuration_manager import Configuration, RuntimeState
+from oakd_tracking_relay.configuration_manager import Configuration
 
 class OakDPro:
-    def __init__(self, config: Configuration, state: RuntimeState):
+    def __init__(self, config: Configuration):
         self.config = config
-        self.state = state
-        self.pipeline = self._createPipeline()
+        self.pipeline = self._create_Pipeline()
         self.device = None
-        self.qSync = None
-        self.qControl = None
-        self.referenceTime = None
+        self.sync_queue = None
+        self.control_queue = None
+        self.reference_time = None
 
     def __enter__(self):
         self.device = dai.Device(self.pipeline, maxUsbSpeed=dai.UsbSpeed.SUPER_PLUS)
         try:
-            print("USB Speed:", self.device.getUsbSpeed())
+            # Dot Matrix führt zu schlechteren Detection Ergebnissen
             self.device.setIrLaserDotProjectorIntensity(0.0)
             self.device.setIrFloodLightIntensity(float(self.config.ir_laser_intensity_percent/100))
         except: 
             pass
         
         # Epoche bis PC-Start
-        self.referenceTime = (time.time() - dai.Clock.now().total_seconds()) * 1000.0
-        self.qSync = self.device.getOutputQueue(name="sync_out", maxSize=1, blocking=False)
-        self.qControl = self.device.getInputQueue(name="control")
+        self.reference_time = (time.time() - dai.Clock.now().total_seconds()) * 1000.0
+        self.sync_queue = self.device.getOutputQueue(name="sync_out", maxSize=1, blocking=False)
+        self.control_queue = self.device.getInputQueue(name="control")
         self.device.setTimesync(timedelta(seconds=2.5), 20, True)
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc, tb):
         if self.device: 
             self.device.close()
-
-    def _createPipeline(self) -> dai.Pipeline:
+        
+    def _create_Pipeline(self) -> dai.Pipeline:
         pipeline = dai.Pipeline()
         pipeline.setXLinkChunkSize(0)
 
-        controlIn = pipeline.create(dai.node.XLinkIn)
-        controlIn.setStreamName('control')
+        control_input_node = pipeline.create(dai.node.XLinkIn)
+        control_input_node.setStreamName('control')
 
         # Links
-        monoLeft = pipeline.create(dai.node.MonoCamera)
-        monoLeft.setBoardSocket(dai.CameraBoardSocket.CAM_B)
-        monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P) 
-        monoLeft.setFps(self.config.fps)
-        monoLeft.initialControl.setManualExposure(self.config.exposure_us, self.config.iso)
+        mono_node_left = pipeline.create(dai.node.MonoCamera)
+        mono_node_left.setBoardSocket(dai.CameraBoardSocket.CAM_B)
+        mono_node_left.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P) 
+        mono_node_left.setFps(self.config.fps)
+        mono_node_left.initialControl.setManualExposure(self.config.exposure_us, self.config.iso)
 
         # Rechts
-        monoRight = pipeline.create(dai.node.MonoCamera)
-        monoRight.setBoardSocket(dai.CameraBoardSocket.CAM_C)
-        monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P) 
-        monoRight.setFps(self.config.fps)
-        monoRight.initialControl.setManualExposure(self.config.exposure_us, self.config.iso)
+        mono_node_right = pipeline.create(dai.node.MonoCamera)
+        mono_node_right.setBoardSocket(dai.CameraBoardSocket.CAM_C)
+        mono_node_right.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P) 
+        mono_node_right.setFps(self.config.fps)
+        mono_node_right.initialControl.setManualExposure(self.config.exposure_us, self.config.iso)
 
-        controlIn.out.link(monoLeft.inputControl)
-        controlIn.out.link(monoRight.inputControl)
+        control_input_node.out.link(mono_node_left.inputControl)
+        control_input_node.out.link(mono_node_right.inputControl)
 
-        syncNode = pipeline.create(dai.node.Sync)
+        sync_node = pipeline.create(dai.node.Sync)
 
         # Outputs
-        monoLeft.out.link(syncNode.inputs["left"])
-        monoRight.out.link(syncNode.inputs["right"])
+        mono_node_left.out.link(sync_node.inputs["left"])
+        mono_node_right.out.link(sync_node.inputs["right"])
 
-        xoutSync = pipeline.create(dai.node.XLinkOut)
-        xoutSync.setStreamName("sync_out")
+        sync_node_out = pipeline.create(dai.node.XLinkOut)
+        sync_node_out.setStreamName("sync_out")
         
-        syncNode.out.link(xoutSync.input)   
+        sync_node.out.link(sync_node_out.input)   
 
         return pipeline
 
-    def _updateSettings(self):
-        if self.qControl is None: 
+    def update_settings(self):
+        if self.control_queue is None: 
             return
         
-        if not getattr(self.state, 'update_trigger', False): 
-            return
-        
-        cameraControl = dai.CameraControl()
-        cameraControl.setManualExposure(self.config.exposure_us, self.config.iso)
-        self.qControl.send(cameraControl)
+        camera_control = dai.CameraControl()
+        camera_control.setManualExposure(self.config.exposure_us, self.config.iso)
+        self.control_queue.send(camera_control)
         
         try:
+            # Dot Matrix führt zu schlechteren Detection Ergebnissen
             self.device.setIrLaserDotProjectorIntensity(0.0)
             self.device.setIrFloodLightIntensity(float(self.config.ir_laser_intensity_percent)/100)
         except: 
             pass
 
-    def get_frames(self):
-        msgGroup = self.qSync.get()
+    def get_stereo_frame(self):
+        frame_group = self.sync_queue.get()
 
-        if msgGroup is not None:
-            inLeft = msgGroup["left"]
-            inRight = msgGroup["right"]
+        if frame_group is not None:
+            frame_left = frame_group["left"]
+            frame_right = frame_group["right"]
             
-            timeSinceEpoch = inLeft.getTimestamp().total_seconds() * 1000.0 + self.referenceTime
+            # Timestamps der Kamera sind relativ zum PC-Start, Umrechnung auf Zeit seit Epoche (1. Januar, 1970)
+            timeSinceEpoch = frame_left.getTimestamp().total_seconds() * 1000.0 + self.reference_time
             
-            return inLeft.getCvFrame(), inRight.getCvFrame(), timeSinceEpoch
+            return frame_left.getCvFrame(), frame_right.getCvFrame(), timeSinceEpoch
         
         return None, None, 0.0

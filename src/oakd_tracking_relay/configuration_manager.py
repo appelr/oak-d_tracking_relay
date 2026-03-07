@@ -3,12 +3,8 @@ import cv2
 import os
 from dataclasses import dataclass, asdict
 
+from oakd_tracking_relay.camera_manager import OakDPro
 from oakd_tracking_relay.tracking_dto import *
-
-@dataclass
-class RuntimeState:
-    update_trigger: bool = True
-    showPreview: bool = True
 
 @dataclass
 class Configuration:
@@ -29,23 +25,23 @@ class Configuration:
     # Tracking
     confidence_percent: int = 75
 
-    def save(self, filename="config.json"):
+    def save_to_file(self, filename="config.json"):
         data = asdict(self)
             
         try:
             with open(filename, 'w') as f:
                 json.dump(data, f, indent=4)
-                print(f"Config gespeichert: {data}", flush=True)
+                print(f"Config in Datei {filename} gespeichert: {data}", flush=True)
         except Exception as e:
-            print(f"Fehler beim Speichern: {e}", flush=True)
+            print(f"Konnte Datei {filename} nicht speichern: {e}", flush=True)
 
     @classmethod
-    def load(cls, filename="config.json"):
+    def load_from_file(cls, filename="config.json"):
         config = cls()
         
         if not os.path.exists(filename):
-            print(f"FEHLER: {filename} fehlt! Bitte Datei erstellen.", flush=True)
-            raise FileNotFoundError(f"{filename} fehlt.")
+            print(f"Datei nicht gefunden: {filename}", flush=True)
+            raise FileNotFoundError(filename)
 
         try:
             with open(filename, 'r') as f:
@@ -55,29 +51,27 @@ class Configuration:
                 if hasattr(config, key):
                     setattr(config, key, value)
             
-            print(f"Config geladen: {data}", flush=True)
+            print(f"Config aus Datei {filename} geladen: {data}", flush=True)
             
         except Exception as e:
-            print(f"KRITISCHER FEHLER: Konnte Config nicht lesen: {e}", flush=True)
+            print(f"Konnte Datei {filename} nicht laden: {e}", flush=True)
             raise e
             
         return config
     
 class ConfigurationUI:
-    def __init__(self, camera, config: Configuration, state: RuntimeState):
+    def __init__(self, camera: OakDPro, config: Configuration):
         self.config = config
-        self.state = state
         self.camera = camera
         self.window_name = "Preview"
-        self.displayFrame = None
-        self.enabled = True
-        self._create()
+        self.display_frame = None
+        self._create_ui_elements()
 
-    # Needed by OpenCV
+    # Benötigtes callback für OpenCV Trackbar
     def _nothing(self, x):
         pass
 
-    def _create(self):
+    def _create_ui_elements(self):
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
 
         cv2.createTrackbar("Apply CLAHE", self.window_name, self.config.apply_clahe, 1, self._nothing)
@@ -92,30 +86,30 @@ class ConfigurationUI:
         cv2.setTrackbarMin("Exposure", self.window_name, 50)
         cv2.setTrackbarMax("Exposure", self.window_name, 9500)
 
+        # Über 90% kann unerwünschtes Verhalten auftreten
         cv2.createTrackbar("IR Laser", self.window_name, self.config.ir_laser_intensity_percent, 0, self._nothing)
         cv2.setTrackbarMin("IR Laser", self.window_name, 0)
         cv2.setTrackbarMax("IR Laser", self.window_name, 90)
 
         cv2.createTrackbar("Min. Confidence", self.window_name, self.config.confidence_percent, 75, self._nothing)
+        cv2.setTrackbarMin("Min. Confidence", self.window_name, 20)
+        cv2.setTrackbarMax("Min. Confidence", self.window_name, 100)
 
-    def shouldExit(self):
+    def check_for_close_key(self):
         return cv2.waitKey(1) & 0xFF == ord("q")
 
     def exit(self):
         cv2.destroyAllWindows()
         cv2.waitKey(1)  
 
-    def setDisplayFrame(self, frame):
-        self.displayFrame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+    def change_display_frame(self, display_frame):
+        self.display_frame = cv2.cvtColor(display_frame, cv2.COLOR_GRAY2BGR)
 
     def show(self):
-        if self.displayFrame is not None:
-            cv2.imshow(self.window_name, self.displayFrame)
+        if self.display_frame is not None:
+            cv2.imshow(self.window_name, self.display_frame)
 
-    def updateConfigIfChanged(self):
-        if not self.enabled:
-            return
-
+    def update_config_if_changed(self):
         new_values = {
             "iso": cv2.getTrackbarPos("ISO", self.window_name),
             "exposure_us": cv2.getTrackbarPos("Exposure", self.window_name),
@@ -125,51 +119,42 @@ class ConfigurationUI:
         }
 
         changed = False
+
         for k, v in new_values.items():
             if getattr(self.config, k) != v:
                 setattr(self.config, k, v)
                 changed = True
 
         if changed:
-            self.state.update_trigger = True
-            self.camera._updateSettings()
-            self.state.update_trigger = False
-            self.config.save()
+            self.camera.update_settings()
+            self.config.save_to_file()
 
-    def drawHandQuadrants(self, hand_ol, hand_ul, hand_or, hand_ur):
+    def draw_hand_quadrants(self, upper_left, lower_left, upper_right, lower_right):
         
-        if self.displayFrame is not None:
+        if self.display_frame is not None:
+            overlay = self.display_frame.copy()
 
-            # 3. Eine leere Folie (Overlay) für die halbtransparenten Farben erstellen
-            overlay = self.displayFrame.copy()
+            half_w, half_h = int(self.config.resolution_width / 2), int(self.config.resolution_height / 2)
 
-            h, w = self.config.resolution_height, self.config.resolution_width
-            half_w, half_h = int(w / 2), int(h / 2)
-
-            # 4. Die Quadranten färben (BGR-Farbcode: Blau, Grün, Rot)
-            if hand_ol: 
+            if upper_left: 
                 cv2.rectangle(overlay, (0, 0), (half_w, half_h), (0, 255, 0), -1)   # Grün
-            if hand_ul: 
-                cv2.rectangle(overlay, (0, half_h), (half_w, h), (255, 0, 0), -1)   # Blau
-            if hand_or: 
-                cv2.rectangle(overlay, (half_w, 0), (w, half_h), (0, 0, 255), -1)   # Rot
-            if hand_ur: 
-                cv2.rectangle(overlay, (half_w, half_h), (w, h), (0, 255, 255), -1) # Gelb
+            if lower_left: 
+                cv2.rectangle(overlay, (0, half_h), (half_w, self.config.resolution_height), (255, 0, 0), -1)   # Blau
+            if upper_right: 
+                cv2.rectangle(overlay, (half_w, 0), (self.config.resolution_width, half_h), (0, 0, 255), -1)   # Rot
+            if lower_right: 
+                cv2.rectangle(overlay, (half_w, half_h), (self.config.resolution_width, self.config.resolution_height), (0, 255, 255), -1) # Gelb
 
-            # 5. Overlay und Originalbild mischen (30% Farb-Deckkraft, 70% Originalbild)
-            cv2.addWeighted(overlay, 0.3, self.displayFrame, 0.7, 0, self.displayFrame)
+            cv2.addWeighted(overlay, 0.3, self.display_frame, 0.7, 0, self.display_frame)
 
-    def drawTrackingData(self, trackingData: TrackingData):
-        if trackingData.valid():
-            leftPointX, leftPointY = int(trackingData.left.aggregated.left.x), int(trackingData.left.aggregated.left.y)
-            rightPointX, rightPointY = int(trackingData.right.aggregated.left.x), int(trackingData.right.aggregated.left.y)
-            if self.displayFrame is not None:
-                cv2.circle(self.displayFrame, (leftPointX, leftPointY), 5, (0, 255, 255), -1)
-                cv2.circle(self.displayFrame, (rightPointX, rightPointY), 5, (0, 255, 0), -1)
+    def draw_eye_landmarks(self, tracking_data: TrackingData):
+        if tracking_data.valid():
+            left_x, left_y = int(tracking_data.left.aggregated.left.x), int(tracking_data.left.aggregated.left.y)
+            right_x, right_y = int(tracking_data.right.aggregated.left.x), int(tracking_data.right.aggregated.left.y)
+            if self.display_frame is not None:
+                cv2.circle(self.display_frame, (left_x, left_y), 5, (0, 255, 255), -1)
+                cv2.circle(self.display_frame, (right_x, right_y), 5, (0, 255, 0), -1)
 
-    def drawDataRate(self, dataRate: float):
-        if self.displayFrame is not None:
-            cv2.putText(self.displayFrame, f"FPS: {int(dataRate)}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-
-
-        
+    def draw_data_rate(self, data_rate: float):
+        if self.display_frame is not None:
+            cv2.putText(self.display_frame, f"FPS: {int(data_rate)}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)

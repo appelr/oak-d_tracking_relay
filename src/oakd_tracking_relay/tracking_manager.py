@@ -26,8 +26,8 @@ class EyeTracker:
         )
         
         # State & Logik
-        self.currentState = TrackerState.SEARCHING
-        self.trackingData = TrackingData()
+        self.current_state = TrackerState.SEARCHING
+        self.tracking_data = TrackingData()
         self.trackingConfidence = 0
         self.frameCounter = 0
         self.detectionBuffer = []
@@ -44,31 +44,31 @@ class EyeTracker:
         self.minTrackingPoints = 2
         
         # Optical Flow
-        self.prevFrameL = None
-        self.prevFrameR = None
+        self.previous_frame_left = None
+        self.previous_frame_right = None
         self.opticalFlowParams = dict(
             winSize=(8, 8), 
             maxLevel=5,
             criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 20, 0.03)
         )
 
-    def processFrame(self, frameL, frameR):
+    def process_stereo_frame(self, frame_left, frame_right):
         self.frameCounter += 1
 
-        if self.currentState == TrackerState.SEARCHING:
-            self._search(frameL, frameR)
-        elif self.currentState == TrackerState.TRACKING:
-            self._track(frameL, frameR)
+        if self.current_state == TrackerState.SEARCHING:
+            self._search(frame_left, frame_right)
+        elif self.current_state == TrackerState.TRACKING:
+            self._track(frame_left, frame_right)
 
     def _decrease_confidence(self, amount=1):
         self.trackingConfidence -= amount
         if self.trackingConfidence <= self.confidenceMin:
-            self.trackingData = TrackingData()
+            self.tracking_data = TrackingData()
             self.detectionBuffer = []
-            self.currentState = TrackerState.SEARCHING
+            self.current_state = TrackerState.SEARCHING
 
-    def _search(self, frameL, frameR):
-        detectedData = self.detect(frameL, frameR)
+    def _search(self, frame_left, frame_right):
+        detectedData = self.detect(frame_left, frame_right)
 
         if detectedData.valid():
             self.detectionBuffer.append(detectedData)
@@ -79,28 +79,28 @@ class EyeTracker:
                 dist = np.hypot(firstPoint.x - lastPoint.x, firstPoint.y - lastPoint.y)
                 
                 if dist < self.searchStabilityThreshold:
-                    self.trackingData = self.detectionBuffer[-1]
+                    self.tracking_data = self.detectionBuffer[-1]
                     self.trackingConfidence = self.confidenceInit
                     self.detectionBuffer = []
-                    self.currentState = TrackerState.TRACKING
+                    self.current_state = TrackerState.TRACKING
                     
                     # WICHTIG: Bilder für den kommenden Optical Flow speichern!
-                    self.prevFrameL, self.prevFrameR = frameL.copy(), frameR.copy()
+                    self.previous_frame_left, self.previous_frame_right = frame_left.copy(), frame_right.copy()
                 else:
                     self.detectionBuffer.pop(0)
         else:
             self.detectionBuffer = []
 
     def _track(self, frameL, frameR): 
-        leftPointsLeftCam = np.array([p.left.as_np() for p in self.trackingData.left.stereoPoints], dtype=np.float32).reshape(-1, 1, 2)
-        leftPointsRightCam = np.array([p.right.as_np() for p in self.trackingData.left.stereoPoints], dtype=np.float32).reshape(-1, 1, 2)
-        rightPointsLeftCam = np.array([p.left.as_np() for p in self.trackingData.right.stereoPoints], dtype=np.float32).reshape(-1, 1, 2)
-        rightPointsRightCam = np.array([p.right.as_np() for p in self.trackingData.right.stereoPoints], dtype=np.float32).reshape(-1, 1, 2)
+        leftPointsLeftCam = np.array([p.left.as_np() for p in self.tracking_data.left.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
+        leftPointsRightCam = np.array([p.right.as_np() for p in self.tracking_data.left.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
+        rightPointsLeftCam = np.array([p.left.as_np() for p in self.tracking_data.right.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
+        rightPointsRightCam = np.array([p.right.as_np() for p in self.tracking_data.right.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
 
-        nextLeftPointsLeftCam, leftStatusLeftCam, _ = cv2.calcOpticalFlowPyrLK(self.prevFrameL, frameL, leftPointsLeftCam, None, **self.opticalFlowParams)
-        nextLeftPointsRightCam, leftStatusRightCam, _ = cv2.calcOpticalFlowPyrLK(self.prevFrameR, frameR, leftPointsRightCam, None, **self.opticalFlowParams)
-        nextRightPointsLeftCam, rightStatusLeftCam, _ = cv2.calcOpticalFlowPyrLK(self.prevFrameL, frameL, rightPointsLeftCam, None, **self.opticalFlowParams)
-        nextRightPointsRightCam, rightStatusRightCam, _ = cv2.calcOpticalFlowPyrLK(self.prevFrameR, frameR, rightPointsRightCam, None, **self.opticalFlowParams)
+        nextLeftPointsLeftCam, leftStatusLeftCam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frameL, leftPointsLeftCam, None, **self.opticalFlowParams)
+        nextLeftPointsRightCam, leftStatusRightCam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frameR, leftPointsRightCam, None, **self.opticalFlowParams)
+        nextRightPointsLeftCam, rightStatusLeftCam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frameL, rightPointsLeftCam, None, **self.opticalFlowParams)
+        nextRightPointsRightCam, rightStatusRightCam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frameR, rightPointsRightCam, None, **self.opticalFlowParams)
 
         if len(leftPointsLeftCam) < self.minTrackingPoints or len(rightPointsLeftCam) < self.minTrackingPoints:
             self._decrease_confidence(amount=2)
@@ -112,22 +112,22 @@ class EyeTracker:
             if leftStatusLeftCam[i][0] == 1 and leftStatusRightCam[i][0] == 1:
                 leftNextL = Point2D(float(nextLeftPointsLeftCam[i][0][0]), float(nextLeftPointsLeftCam[i][0][1]))
                 leftNextR = Point2D(float(nextLeftPointsRightCam[i][0][0]), float(nextLeftPointsRightCam[i][0][1]))
-                data.left.stereoPoints.append(StereoPoint(leftNextL, leftNextR))
+                data.left.stereo_points.append(StereoPoint(leftNextL, leftNextR))
 
         for i in range(len(rightPointsLeftCam)):
             if rightStatusLeftCam[i][0] == 1 and rightStatusRightCam[i][0] == 1:
                 rightNextL = Point2D(float(nextRightPointsLeftCam[i][0][0]), float(nextRightPointsLeftCam[i][0][1]))
                 rightNextR = Point2D(float(nextRightPointsRightCam[i][0][0]), float(nextRightPointsRightCam[i][0][1]))
-                data.right.stereoPoints.append(StereoPoint(rightNextL, rightNextR))
+                data.right.stereo_points.append(StereoPoint(rightNextL, rightNextR))
 
-        if len(data.left.stereoPoints) < self.minTrackingPoints or len(data.right.stereoPoints) < self.minTrackingPoints:
+        if len(data.left.stereo_points) < self.minTrackingPoints or len(data.right.stereo_points) < self.minTrackingPoints:
             self._decrease_confidence(amount=2)
             return
 
         if data.valid():
             data.aggregate_median()
 
-        oldCenter = self.trackingData.aggregated
+        oldCenter = self.tracking_data.aggregated
         newCenter = data.aggregated
         distX = newCenter.left.x - oldCenter.left.x
         distY = newCenter.left.y - oldCenter.left.y
@@ -138,8 +138,8 @@ class EyeTracker:
             self._decrease_confidence()
             return
         
-        self.trackingData = data
-        self.prevFrameL, self.prevFrameR = frameL.copy(), frameR.copy()
+        self.tracking_data = data
+        self.previous_frame_left, self.previous_frame_right = frameL.copy(), frameR.copy()
         self.trackingConfidence = min(self.trackingConfidence + 1, self.confidenceInit)
     
         # --- RECHECK ---
@@ -154,10 +154,10 @@ class EyeTracker:
                     distMP = np.hypot(firstPoint.x - lastPoint.x, firstPoint.y - lastPoint.y)
 
                     if distMP < self.searchStabilityThreshold:
-                        distMPOF = np.hypot(lastPoint.x - self.trackingData.aggregated.left.x, lastPoint.y - self.trackingData.aggregated.left.y) 
+                        distMPOF = np.hypot(lastPoint.x - self.tracking_data.aggregated.left.x, lastPoint.y - self.tracking_data.aggregated.left.y) 
                         if distMPOF > self.recheckCorrectionThreshold:
-                            self.trackingData = recheckData
-                            self.prevFrameL, self.prevFrameR = frameL.copy(), frameR.copy()
+                            self.tracking_data = recheckData
+                            self.previous_frame_left, self.previous_frame_right = frameL.copy(), frameR.copy()
                             self.trackingConfidence = self.confidenceInit
                     self.detectionBuffer = []
             else:
@@ -167,9 +167,9 @@ class EyeTracker:
         centerL = Point2D()
         centerR = Point2D()
 
-        if self.trackingData.valid():
-            centerL = self.trackingData.aggregated.left
-            centerR = self.trackingData.aggregated.right
+        if self.tracking_data.valid():
+            centerL = self.tracking_data.aggregated.left
+            centerR = self.tracking_data.aggregated.right
 
         # --- ROI Debug Window ---
         debugFrameL = cv2.cvtColor(frameL.copy(), cv2.COLOR_GRAY2BGR)
@@ -203,12 +203,12 @@ class EyeTracker:
             for idx in leftIrisIndices:
                 left  = Point2D(offxL + landmarksL.landmark[idx].x * cropL.shape[1], offyL + landmarksL.landmark[idx].y * cropL.shape[0])
                 right = Point2D(offxR + landmarksR.landmark[idx].x * cropR.shape[1], offyR + landmarksR.landmark[idx].y * cropR.shape[0])
-                data.left.stereoPoints.append(StereoPoint(left, right))
+                data.left.stereo_points.append(StereoPoint(left, right))
 
             for idx in rightIrisIndices:
                 left  = Point2D(offxL + landmarksL.landmark[idx].x * cropL.shape[1], offyL + landmarksL.landmark[idx].y * cropL.shape[0])
                 right = Point2D(offxR + landmarksR.landmark[idx].x * cropR.shape[1], offyR + landmarksR.landmark[idx].y * cropR.shape[0])
-                data.right.stereoPoints.append(StereoPoint(left, right))
+                data.right.stereo_points.append(StereoPoint(left, right))
 
             if data.valid():
                 data.aggregate_median()

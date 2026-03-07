@@ -10,54 +10,53 @@ class ProcessingUtils:
         self.camera = camera
         self.config = config
 
-        calibData = self.camera.device.readCalibration()
+        calibration_data = self.camera.device.readCalibration()
         
-        # Intrinsics
-        self.K1 = np.array(calibData.getCameraIntrinsics(dai.CameraBoardSocket.CAM_B, self.config.resolution_width, self.config.resolution_height))
-        self.D1 = np.array(calibData.getDistortionCoefficients(dai.CameraBoardSocket.CAM_B))
+        # Intrinische Daten abfragen
+        self.intrinsics_left = np.array(calibration_data.getCameraIntrinsics(dai.CameraBoardSocket.CAM_B, self.config.resolution_width, self.config.resolution_height))
+        self.intrinsics_right = np.array(calibration_data.getCameraIntrinsics(dai.CameraBoardSocket.CAM_C,self.config.resolution_width, self.config.resolution_height))
 
-        self.K2 = np.array(calibData.getCameraIntrinsics(dai.CameraBoardSocket.CAM_C,self.config.resolution_width, self.config.resolution_height))
-        self.D2 = np.array(calibData.getDistortionCoefficients(dai.CameraBoardSocket.CAM_C))
+        # Verzerrung abfragen
+        self.distortion_left = np.array(calibration_data.getDistortionCoefficients(dai.CameraBoardSocket.CAM_B))
+        self.distortion_right = np.array(calibration_data.getDistortionCoefficients(dai.CameraBoardSocket.CAM_C))
 
-        self.fx = self.K1[0,0]
-        self.fy = self.K1[1,1]
-        self.cx = self.K1[0,2]
-        self.cy = self.K1[1,2]
+        # Brennweite und Bildmitte
+        self.focal_length_x = self.intrinsics_left[0,0]
+        self.focal_length_y = self.intrinsics_left[1,1]
+        self.center_x = self.intrinsics_left[0,2]
+        self.center_y = self.intrinsics_left[1,2]
 
-        # Extrinsics
-        extrinsics = np.array(calibData.getCameraExtrinsics(dai.CameraBoardSocket.CAM_B, dai.CameraBoardSocket.CAM_C))
+        # Extrinsische Daten der Kamera abfragen
+        extrinsics = np.array(calibration_data.getCameraExtrinsics(dai.CameraBoardSocket.CAM_B, dai.CameraBoardSocket.CAM_C))
         
-        self.R = extrinsics[:3, :3]
-        # cm -> mm
-        self.T = extrinsics[:3, 3].reshape(3,1) * 10
+        self.rotation = extrinsics[:3, :3]
+        self.translation = extrinsics[:3, 3].reshape(3,1) * 10
 
-        # cm -> mm
-        self.baseline = calibData.getBaselineDistance() * 10
+        self.baseline = calibration_data.getBaselineDistance() * 10
 
-        # Calculate Rectification Matrix
-        imageSize = (self.config.resolution_width, self.config.resolution_height)
+        image_size = (self.config.resolution_width, self.config.resolution_height)
 
-        self.R1, self.R2, self.P1, self.P2, self.Q, _, _ = cv2.stereoRectify(
-            self.K1, self.D1,
-            self.K2, self.D2,
-            imageSize=imageSize,
-            R=self.R,
-            T=self.T,
+        # Rektifizierungsmatritzen berechnen
+        self.rotation_left, self.rotation_right, self.projection_left, self.projection_right, _, _, _ = cv2.stereoRectify(
+            self.intrinsics_left, self.distortion_left,
+            self.intrinsics_right, self.distortion_right,
+            imageSize=image_size,
+            R=self.rotation,
+            T=self.translation,
             flags=cv2.CALIB_ZERO_DISPARITY,
             alpha=0
         )
 
-        # Calculate Remapping Tables
-        self.map1x, self.map1y = cv2.initUndistortRectifyMap(
-            self.K1, self.D1, 
-            self.R1, self.P1,
-            imageSize, 
+        self.map_left_x, self.map_left_y = cv2.initUndistortRectifyMap(
+            self.intrinsics_left, self.distortion_left, 
+            self.rotation_left, self.projection_left,
+            image_size, 
             cv2.CV_16SC2
         )
-        self.map2x, self.map2y = cv2.initUndistortRectifyMap(
-            self.K2, self.D2, 
-            self.R2, self.P2,
-            imageSize, 
+        self.map_right_x, self.map_right_y = cv2.initUndistortRectifyMap(
+            self.intrinsics_right, self.distortion_right, 
+            self.rotation_right, self.projection_right,
+            image_size, 
             cv2.CV_16SC2
         )
 
@@ -70,45 +69,38 @@ class ProcessingUtils:
         self.prev_frame_time = 0.0
         self.smoothed_dt = 0.0
 
-    def stereoLandmarkToPixelCoordinates(self, stereoPoint: StereoPoint) -> StereoPoint: 
-        leftCam = stereoPoint.left
-        rightCam = stereoPoint.right
+    def stereo_point_to_pixel_coordinates(self, stereo_point: StereoPoint) -> StereoPoint: 
+        left = self._point_to_pixel_coordinates(stereo_point.left)
+        right = self._point_to_pixel_coordinates(stereo_point.right)
 
-        leftPoint = self._landmarkToPixelCoordinates(leftCam)
-        rightPoint = self._landmarkToPixelCoordinates(rightCam)
-        
-        return StereoPoint(leftPoint, rightPoint)
+        return StereoPoint(left, right)
 
-    def _landmarkToPixelCoordinates(self, point: Point2D) -> Point2D:
+    def _point_to_pixel_coordinates(self, point: Point2D) -> Point2D:
         x = float(point.x * self.config.resolution_width)
         y = float(point.y * self.config.resolution_height)
 
         return Point2D(x, y)
 
-    def rectifyStereoFrame(self, frameL, frameR):
-        rectL = cv2.remap(frameL, self.map1x, self.map1y, cv2.INTER_LINEAR)
-        rectR = cv2.remap(frameR, self.map2x, self.map2y, cv2.INTER_LINEAR)
+    def rectify_stereo_frame(self, frame_left, frame_right):
+        left = cv2.remap(frame_left, self.map_left_x, self.map_left_y, cv2.INTER_LINEAR)
+        right = cv2.remap(frame_right, self.map_right_x, self.map_right_y, cv2.INTER_LINEAR)
         
-        return rectL, rectR
+        return left, right
     
-    def triangulatePoints_CV(self, stereoPoint: StereoPoint) -> Point3D:
-        left = stereoPoint.left.as_np()
-        right = stereoPoint.right.as_np()
+    def triangulate_stereo_point(self, stereo_point: StereoPoint) -> Point3D:
+        left = stereo_point.left.as_np()
+        right = stereo_point.right.as_np()
 
-        # OpenCV Triangulation
-        points4D = cv2.triangulatePoints(self.P1, self.P2, left, right)
+        points_4D = cv2.triangulatePoints(self.projection_left, self.projection_right, left, right)
+        points_3D = points_4D[:3] / points_4D[3:]
 
-        # 4D in 3D umwandeln (X, Y, Z durch W teilen)
-        points3D = points4D[:3] / points4D[3:]
-
-        # .item() extrahiert die reine Python-Zahl (Float) aus dem NumPy-Array
-        x = points3D[0].item()
-        y = points3D[1].item()
-        z = points3D[2].item()
+        x = points_3D[0].item()
+        y = points_3D[1].item()
+        z = points_3D[2].item()
 
         return Point3D(x, y, z)
     
-    def getDataRate(self):
+    def get_data_rate(self):
         current_frame_time = time.perf_counter()
         if self.prev_frame_time != 0:
             dt = current_frame_time - self.prev_frame_time # Verstrichene Zeit für diesen Frame
@@ -116,71 +108,76 @@ class ProcessingUtils:
             if self.smoothed_dt == 0.0:
                 self.smoothed_dt = dt
             else:
-                # Wir glätten die Sekunden! 90% alter Zeitwert, 10% neuer Zeitwert
                 self.smoothed_dt = (self.smoothed_dt * 0.90) + (dt * 0.10)
             
-            # FPS ist 1 / durchschnittliche Dauer
-            dataRate = 1.0 / self.smoothed_dt 
+            data_rate = 1.0 / self.smoothed_dt 
         else:
-            dataRate = 0.0
+            data_rate = 0.0
             
         self.prev_frame_time = current_frame_time
-        return dataRate
+        return data_rate
     
-    def getBestFace(self, resultsL, resultsR):
+    def get_best_face(self, results_left, results_right):
         scores = []
 
-        for i, (fL, fR) in enumerate(zip(resultsL.multi_face_landmarks,
-                                        resultsR.multi_face_landmarks)):
-            scoreL = self.calculateFaceScore(fL)
-            scoreR = self.calculateFaceScore(fR)
+        for i, (face_left, face_right) in enumerate(zip(results_left.multi_face_landmarks,
+                                        results_right.multi_face_landmarks)):
+            score_left = self._calculate_face_score(face_left)
+            score_right = self._calculate_face_score(face_right)
 
             # Stereo-Score = Mittelwert
-            scores.append((i, (scoreL + scoreR) / 2))
+            scores.append((i, (score_left + score_right) / 2))
 
-        best_idx = max(scores, key=lambda x: x[1])[0]
-        return best_idx
+        best_face = max(scores, key=lambda x: x[1])[0]
+        return best_face
 
-    def calculateFaceScore(self, face_landmarks, area_weight=0.5, center_weight=0.5):
-        xs = np.array([lm.x for lm in face_landmarks.landmark])
-        ys = np.array([lm.y for lm in face_landmarks.landmark])
+    def _calculate_face_score(self, face_landmarks, area_weight=0.5, center_weight=0.5):
+        coordinates_x = np.array([lm.x for lm in face_landmarks.landmark])
+        coordinates_y = np.array([lm.y for lm in face_landmarks.landmark])
 
-        # Bounding box (normiert)
-        xmin, xmax = xs.min(), xs.max()
-        ymin, ymax = ys.min(), ys.max()
+        min_x, max_x = coordinates_x.min(), coordinates_x.max()
+        min_y, max_y = coordinates_y.min(), coordinates_y.max()
 
-        area = (xmax - xmin) * (ymax - ymin)
+        # Bounding-Box Größe
+        area = (max_x - min_x) * (max_y - min_y)
 
-        # Center distance
-        cx = (xmin + xmax) / 2
-        cy = (ymin + ymax) / 2
-        # center_dist = np.sqrt((cx - 0.5)**2 + (cy - 0.5)**2)
-        center_dist = np.hypot(cx - 0.5, cy - 0.5)
+        # Distanz zur Bildmitte
+        center_distance_x = (min_x + max_x) / 2
+        center_distance_y = (min_y + max_y) / 2
 
-        # Kombinierter Score (größer = besser)
+        center_dist = np.hypot(center_distance_x - 0.5, center_distance_y - 0.5)
+
+        # Kombinierter Score (mit Gewichten)
         score = area_weight * area - center_weight * center_dist
         return score
     
-    def cropFrame(self, frame, center: Point2D):
-        h, w = frame.shape[:2]
+    def crop_frame(self, frame, center: Point2D):
+        height, width = frame.shape[:2]
 
+        # Weniger Crop, wenn kein Gesicht gefunden wurde
         if not center.valid():
             scale = 0.6
-            cx = w // 2
-            cy = h // 2
+            center_x = width // 2
+            center_y = height // 2
         else:
             scale = 0.4
-            cx = int(center.x)
-            cy = int(center.y)
+            center_x = int(center.x)
+            center_y = int(center.y)
 
-        ch, cw = int(h * scale), int(w * scale)
+        crop_height, crop_width = int(height * scale), int(width * scale)
 
-        # linke obere Ecke berechnen
-        x0 = cx - cw // 2
-        y0 = cy - ch // 2
+        # Ursprung links oben
+        origin_x = center_x - crop_width // 2
+        origin_y = center_y - crop_height // 2
 
-        # Clamping damit wir nicht aus dem Bild laufen
-        x0 = max(0, min(x0, w - cw))
-        y0 = max(0, min(y0, h - ch))
+        # Clamping
+        origin_x = max(0, min(origin_x, width - crop_width))
+        origin_y = max(0, min(origin_y, height - crop_height))
 
-        return frame[y0:y0+ch, x0:x0+cw], x0, y0
+        return frame[origin_y:origin_y+crop_height, origin_x:origin_x+crop_width], origin_x, origin_y
+    
+    def apply_clahe_to_stereo_frame(self, frame_left, frame_right):
+        frame_left = self.clahe.apply(frame_left)
+        frame_right = self.clahe.apply(frame_right)
+
+        return frame_left, frame_right

@@ -1,9 +1,7 @@
 from dataclasses import dataclass, asdict
-import depthai as dai
 import json
 import cv2
 import os
-import sys
 
 from oakd_tracking_relay.TrackingDTO import *
 

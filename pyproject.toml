@@ -30,13 +30,9 @@ dependencies = [
     "depthai>=2.0,<3.0",
     "opencv-python",
     "mediapipe>=0.10.14,<0.10.15",
-    "nicegui",
     "numpy",
     "orjson",
-    "matplotlib",
 ]
 
 [project.scripts]
-start-tracking = "oakd_tracking_relay.Worker:main"
 start-config = "oakd_tracking_relay.setup:main"
-start-simulation = "oakd_tracking_relay.simulation:main"

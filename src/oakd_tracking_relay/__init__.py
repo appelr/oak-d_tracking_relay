@@ -1,3 +1,3 @@
-from .Worker import main
+from .setup import main
 
 __all__ = ["main"]

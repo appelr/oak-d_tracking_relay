@@ -5,7 +5,6 @@ from dataclasses import dataclass, asdict
 
 from oakd_tracking_relay.TrackingDTO import *
 
-
 @dataclass
 class RuntimeState:
     update_trigger: bool = True
@@ -20,16 +19,15 @@ class Configuration:
     
     # Kamera
     fps: int = 100
-    exposure_us: int = 600
-    iso: int = 200
-    clahe: int = 1
+    iso: int = 1000
+    exposure_us: int = 4000
+    apply_clahe: int = 1
     ir_laser_intensity_percent: int = 100
-    resolutionWidth: int = 640
-    resolutionHeight: int = 400
+    resolution_width: int = 640
+    resolution_height: int = 400
     
     # Tracking
-    mp_min_detection_percent: int = 40
-    mp_min_tracking_percent: int = 20
+    confidence_percent: int = 75
 
     def save(self, filename="config.json"):
         data = asdict(self)
@@ -82,9 +80,9 @@ class ConfigurationUI:
     def _create(self):
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
 
-        cv2.createTrackbar("CLAHE", self.window_name, self.config.clahe, 1, self._nothing)
-        cv2.setTrackbarMin("CLAHE", self.window_name, 0)
-        cv2.setTrackbarMax("CLAHE", self.window_name, 1)
+        cv2.createTrackbar("Apply CLAHE", self.window_name, self.config.apply_clahe, 1, self._nothing)
+        cv2.setTrackbarMin("Apply CLAHE", self.window_name, 0)
+        cv2.setTrackbarMax("Apply CLAHE", self.window_name, 1)
 
         cv2.createTrackbar("ISO", self.window_name, self.config.iso, 1000, self._nothing)
         cv2.setTrackbarMin("ISO", self.window_name, 100)
@@ -98,8 +96,7 @@ class ConfigurationUI:
         cv2.setTrackbarMin("IR Laser", self.window_name, 0)
         cv2.setTrackbarMax("IR Laser", self.window_name, 90)
 
-        cv2.createTrackbar("Min. Detection", self.window_name, self.config.mp_min_detection_percent, 100, self._nothing)
-        cv2.createTrackbar("Min. Tracking", self.window_name, self.config.mp_min_tracking_percent, 100, self._nothing)
+        cv2.createTrackbar("Min. Confidence", self.window_name, self.config.confidence_percent, 75, self._nothing)
 
     def shouldExit(self):
         return cv2.waitKey(1) & 0xFF == ord("q")
@@ -122,10 +119,9 @@ class ConfigurationUI:
         new_values = {
             "iso": cv2.getTrackbarPos("ISO", self.window_name),
             "exposure_us": cv2.getTrackbarPos("Exposure", self.window_name),
-            "clahe": cv2.getTrackbarPos("CLAHE", self.window_name),
+            "apply_clahe": cv2.getTrackbarPos("Apply CLAHE", self.window_name),
             "ir_laser_intensity_percent": cv2.getTrackbarPos("IR Laser", self.window_name),
-            "mp_min_detection_percent": cv2.getTrackbarPos("Min. Detection", self.window_name),
-            "mp_min_tracking_percent": cv2.getTrackbarPos("Min. Tracking", self.window_name),
+            "confidence_percent": cv2.getTrackbarPos("Min. Confidence", self.window_name),
         }
 
         changed = False
@@ -147,7 +143,7 @@ class ConfigurationUI:
             # 3. Eine leere Folie (Overlay) für die halbtransparenten Farben erstellen
             overlay = self.displayFrame.copy()
 
-            h, w = self.config.resolutionHeight, self.config.resolutionWidth
+            h, w = self.config.resolution_height, self.config.resolution_width
             half_w, half_h = int(w / 2), int(h / 2)
 
             # 4. Die Quadranten färben (BGR-Farbcode: Blau, Grün, Rot)

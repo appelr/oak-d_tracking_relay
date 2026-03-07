@@ -15,14 +15,13 @@ def main():
 
     with OakD(config, state) as camera:
         utils = ProcessingUtils(camera=camera, config=config)
-
         ui = ConfigurationUI(camera, config, state)
 
         eyeTracker = EyeTracker(utils, config)
         handTracker = HandTracker(config)
 
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        hand_task = None
+        handTrackingTask = None
         hand_ol, hand_ul, hand_or, hand_ur = False, False, False, False
 
         while True:
@@ -38,7 +37,7 @@ def main():
             # frameR = cv2.rotate(frameR, cv2.ROTATE_180)
             # frameL, frameR = frameR, frameL
 
-            if config.clahe == 1:
+            if config.apply_clahe == 1:
                 frameL = utils.clahe.apply(frameL)
                 frameR = utils.clahe.apply(frameR)
 
@@ -47,15 +46,15 @@ def main():
             
             eyeTracker.processFrame(frameL, frameR)
 
-            if hand_task is None or hand_task.done():
+            if handTrackingTask is None or handTrackingTask.done():
                 
-                if hand_task is not None:
+                if handTrackingTask is not None:
                     try:
-                        hand_ol, hand_ul, hand_or, hand_ur = hand_task.result()
+                        hand_ol, hand_ul, hand_or, hand_ur = handTrackingTask.result()
                     except Exception as e:
                         print(f"Fehler im Hand-Thread: {e}")
 
-                hand_task = executor.submit(handTracker.check_presence, frameL.copy())
+                handTrackingTask = executor.submit(handTracker.check_presence, frameL.copy())
 
             dataRate = utils.getDataRate()
 

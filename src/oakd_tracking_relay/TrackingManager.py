@@ -21,8 +21,8 @@ class EyeTracker:
         self.model = mp.solutions.face_mesh.FaceMesh(
             max_num_faces=4, 
             refine_landmarks=True,
-            min_detection_confidence=float(config.mp_min_detection_percent)/100, 
-            min_tracking_confidence=float(config.mp_min_tracking_percent/100)
+            min_detection_confidence=float(config.confidence_percent)/100, 
+            min_tracking_confidence=float(config.confidence_percent/100)
         )
         
         # State & Logik
@@ -224,8 +224,8 @@ class HandTracker:
         self.model = mp.solutions.hands.Hands( 
             max_num_hands=2,
             model_complexity=0,
-            min_detection_confidence=float(config.mp_min_detection_percent/100),
-            min_tracking_confidence=float(config.mp_min_tracking_percent/100)
+            min_detection_confidence=float(config.confidence_percent/100),
+            min_tracking_confidence=float(config.confidence_percent/100)
         )
         self.config = config
         
@@ -244,13 +244,13 @@ class HandTracker:
         found_or = False
         found_ur = False
         
-        half_width = self.config.resolutionWidth / 2
-        half_height = self.config.resolutionHeight / 2
+        half_width = self.config.resolution_width / 2
+        half_height = self.config.resolution_height / 2
         
         if results.multi_hand_landmarks:
             for landmarks in results.multi_hand_landmarks:
-                x_pixel = landmarks.landmark[9].x * self.config.resolutionWidth
-                y_pixel = landmarks.landmark[9].y * self.config.resolutionHeight
+                x_pixel = landmarks.landmark[9].x * self.config.resolution_width
+                y_pixel = landmarks.landmark[9].y * self.config.resolution_height
                 
                 if x_pixel < half_width and y_pixel < half_height:
                     found_ol = True

@@ -13,10 +13,10 @@ class ProcessingUtils:
         calibData = self.camera.device.readCalibration()
         
         # Intrinsics
-        self.K1 = np.array(calibData.getCameraIntrinsics(dai.CameraBoardSocket.CAM_B, self.config.resolutionWidth, self.config.resolutionHeight))
+        self.K1 = np.array(calibData.getCameraIntrinsics(dai.CameraBoardSocket.CAM_B, self.config.resolution_width, self.config.resolution_height))
         self.D1 = np.array(calibData.getDistortionCoefficients(dai.CameraBoardSocket.CAM_B))
 
-        self.K2 = np.array(calibData.getCameraIntrinsics(dai.CameraBoardSocket.CAM_C,self.config.resolutionWidth, self.config.resolutionHeight))
+        self.K2 = np.array(calibData.getCameraIntrinsics(dai.CameraBoardSocket.CAM_C,self.config.resolution_width, self.config.resolution_height))
         self.D2 = np.array(calibData.getDistortionCoefficients(dai.CameraBoardSocket.CAM_C))
 
         self.fx = self.K1[0,0]
@@ -35,7 +35,7 @@ class ProcessingUtils:
         self.baseline = calibData.getBaselineDistance() * 10
 
         # Calculate Rectification Matrix
-        imageSize = (self.config.resolutionWidth, self.config.resolutionHeight)
+        imageSize = (self.config.resolution_width, self.config.resolution_height)
 
         self.R1, self.R2, self.P1, self.P2, self.Q, _, _ = cv2.stereoRectify(
             self.K1, self.D1,
@@ -80,8 +80,8 @@ class ProcessingUtils:
         return StereoPoint(leftPoint, rightPoint)
 
     def _landmarkToPixelCoordinates(self, point: Point2D) -> Point2D:
-        x = float(point.x * self.config.resolutionWidth)
-        y = float(point.y * self.config.resolutionHeight)
+        x = float(point.x * self.config.resolution_width)
+        y = float(point.y * self.config.resolution_height)
 
         return Point2D(x, y)
 

@@ -1,0 +1,13 @@
+{
+    "udp_ip": "127.0.0.1",
+    "udp_port_eyes": 5005,
+    "udp_port_hands": 5006,
+    "fps": 100,
+    "iso": 1000,
+    "exposure_us": 4000,
+    "apply_clahe": 1,
+    "ir_laser_intensity_percent": 0,
+    "resolution_width": 640,
+    "resolution_height": 400,
+    "confidence_percent": 75
+}

@@ -9,51 +9,54 @@ class TrackerState(Enum):
     SEARCHING = auto()
     TRACKING = auto()
 
-# =========================================================================================
-# EYE TRACKER (Alles in einer Klasse vereint: Logik, Optical Flow & MediaPipe)
-# =========================================================================================
 class EyeTracker:
     def __init__(self, utils, config):
         self.utils = utils
         self.config = config
+        self.current_state = TrackerState.SEARCHING
+        self.tracking_data = TrackingData()
         
-        # MediaPipe FaceMesh
+        # MediaPipe FaceMesh 
         self.model = mp.solutions.face_mesh.FaceMesh(
             max_num_faces=4, 
-            refine_landmarks=True,
-            static_image_mode=True, # Tracking-infos ignorieren, da wir Optical Flow nutzen
+            refine_landmarks=True, # Benötigt für Iris-Koordinaten
+            static_image_mode=True, # Tracking-Infos ignorieren, da wir Optical Flow nutzen
             min_detection_confidence=float(config.confidence_percent)/100
         )
         
-        # State & Logik
-        self.current_state = TrackerState.SEARCHING
-        self.tracking_data = TrackingData()
-        self.trackingConfidence = 0
-        self.frameCounter = 0
-        self.detectionBuffer = []
-        self.detectionBufferMaxSize = 2
-        self.confidenceInit = 15
-        self.confidenceMin = 0
+        # Schwellwerte für Wechsel Tracking -> Searching
+        self.tracking_confidence_counter = 0
+        self.tracking_confidence_init = 15
+        self.tracking_confidence_minimum = 0
 
-        # Thresholds
-        self.searchStabilityThreshold = 20
-        self.recheckCorrectionThreshold = 1.5
-        self.recheckInterval = 15
-        self.maxJump = 35
-        self.maxDispDelta = 10
-        self.minTrackingPoints = 2
-        
+        # Schwellwerte für Wechsel Searching -> Tracking
+        self.detection_buffer = []
+        self.detection_buffer_max_size = 2
+
+        # Counter für Mediapipe Recheck
+        self.frame_count = 0
+        self.recheck_interval = 15
+
         # Optical Flow
         self.previous_frame_left = None
         self.previous_frame_right = None
-        self.opticalFlowParams = dict(
+        self.optical_flow_params = dict(
             winSize=(8, 8), 
             maxLevel=5,
             criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 20, 0.03)
         )
 
+        # Schwellwerte für Sprünge zwischen Mediapipe und OpticalFlow
+        self.search_stability_threshold = 20
+        self.max_diff_opticalflow_mediapipe = 1.5
+        self.max_jump_between_frames = 35
+        self.max_disparity_between_frames = 10
+
+        # Ab wievielen Punkten ist TrackingData valide
+        self.min_tracking_points = 2
+
     def process_stereo_frame(self, frame_left, frame_right):
-        self.frameCounter += 1
+        self.frame_count += 1
 
         if self.current_state == TrackerState.SEARCHING:
             self._search(frame_left, frame_right)
@@ -61,35 +64,35 @@ class EyeTracker:
             self._track(frame_left, frame_right)
 
     def _decrease_confidence(self, amount=1):
-        self.trackingConfidence -= amount
-        if self.trackingConfidence <= self.confidenceMin:
+        self.tracking_confidence_counter -= amount
+        if self.tracking_confidence_counter <= self.tracking_confidence_minimum:
             self.tracking_data = TrackingData()
-            self.detectionBuffer = []
+            self.detection_buffer = []
             self.current_state = TrackerState.SEARCHING
 
     def _search(self, frame_left, frame_right):
         detectedData = self.detect(frame_left, frame_right)
 
         if detectedData.valid():
-            self.detectionBuffer.append(detectedData)
+            self.detection_buffer.append(detectedData)
             
-            if len(self.detectionBuffer) == self.detectionBufferMaxSize:
-                firstPoint = self.detectionBuffer[0].aggregated.left
-                lastPoint = self.detectionBuffer[-1].aggregated.left
+            if len(self.detection_buffer) == self.detection_buffer_max_size:
+                firstPoint = self.detection_buffer[0].aggregated.left
+                lastPoint = self.detection_buffer[-1].aggregated.left
                 dist = np.hypot(firstPoint.x - lastPoint.x, firstPoint.y - lastPoint.y)
                 
-                if dist < self.searchStabilityThreshold:
-                    self.tracking_data = self.detectionBuffer[-1]
-                    self.trackingConfidence = self.confidenceInit
-                    self.detectionBuffer = []
+                if dist < self.search_stability_threshold:
+                    self.tracking_data = self.detection_buffer[-1]
+                    self.tracking_confidence_counter = self.tracking_confidence_init
+                    self.detection_buffer = []
                     self.current_state = TrackerState.TRACKING
                     
                     # WICHTIG: Bilder für den kommenden Optical Flow speichern!
                     self.previous_frame_left, self.previous_frame_right = frame_left.copy(), frame_right.copy()
                 else:
-                    self.detectionBuffer.pop(0)
+                    self.detection_buffer.pop(0)
         else:
-            self.detectionBuffer = []
+            self.detection_buffer = []
 
     def _track(self, frameL, frameR): 
         leftPointsLeftCam = np.array([p.left.as_np() for p in self.tracking_data.left.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
@@ -97,12 +100,12 @@ class EyeTracker:
         rightPointsLeftCam = np.array([p.left.as_np() for p in self.tracking_data.right.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
         rightPointsRightCam = np.array([p.right.as_np() for p in self.tracking_data.right.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
 
-        nextLeftPointsLeftCam, leftStatusLeftCam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frameL, leftPointsLeftCam, None, **self.opticalFlowParams)
-        nextLeftPointsRightCam, leftStatusRightCam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frameR, leftPointsRightCam, None, **self.opticalFlowParams)
-        nextRightPointsLeftCam, rightStatusLeftCam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frameL, rightPointsLeftCam, None, **self.opticalFlowParams)
-        nextRightPointsRightCam, rightStatusRightCam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frameR, rightPointsRightCam, None, **self.opticalFlowParams)
+        nextLeftPointsLeftCam, leftStatusLeftCam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frameL, leftPointsLeftCam, None, **self.optical_flow_params)
+        nextLeftPointsRightCam, leftStatusRightCam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frameR, leftPointsRightCam, None, **self.optical_flow_params)
+        nextRightPointsLeftCam, rightStatusLeftCam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frameL, rightPointsLeftCam, None, **self.optical_flow_params)
+        nextRightPointsRightCam, rightStatusRightCam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frameR, rightPointsRightCam, None, **self.optical_flow_params)
 
-        if len(leftPointsLeftCam) < self.minTrackingPoints or len(rightPointsLeftCam) < self.minTrackingPoints:
+        if len(leftPointsLeftCam) < self.min_tracking_points or len(rightPointsLeftCam) < self.min_tracking_points:
             self._decrease_confidence(amount=2)
             return
 
@@ -120,7 +123,7 @@ class EyeTracker:
                 rightNextR = Point2D(float(nextRightPointsRightCam[i][0][0]), float(nextRightPointsRightCam[i][0][1]))
                 data.right.stereo_points.append(StereoPoint(rightNextL, rightNextR))
 
-        if len(data.left.stereo_points) < self.minTrackingPoints or len(data.right.stereo_points) < self.minTrackingPoints:
+        if len(data.left.stereo_points) < self.min_tracking_points or len(data.right.stereo_points) < self.min_tracking_points:
             self._decrease_confidence(amount=2)
             return
 
@@ -134,34 +137,34 @@ class EyeTracker:
         prevDisp = oldCenter.left.x - oldCenter.right.x
         currentDisp = newCenter.left.x - newCenter.right.x
 
-        if np.hypot(distX, distY) > self.maxJump or abs(currentDisp - prevDisp) > self.maxDispDelta:
+        if np.hypot(distX, distY) > self.max_jump_between_frames or abs(currentDisp - prevDisp) > self.max_disparity_between_frames:
             self._decrease_confidence()
             return
         
         self.tracking_data = data
         self.previous_frame_left, self.previous_frame_right = frameL.copy(), frameR.copy()
-        self.trackingConfidence = min(self.trackingConfidence + 1, self.confidenceInit)
+        self.tracking_confidence_counter = min(self.tracking_confidence_counter + 1, self.tracking_confidence_init)
     
         # --- RECHECK ---
-        if self.frameCounter % self.recheckInterval == 0 or len(self.detectionBuffer) > 0:
+        if self.frame_count % self.recheck_interval == 0 or len(self.detection_buffer) > 0:
             recheckData = self.detect(frameL, frameR)
 
             if recheckData.valid():
-                self.detectionBuffer.append(recheckData)
-                if len(self.detectionBuffer) == self.detectionBufferMaxSize:
-                    firstPoint = self.detectionBuffer[0].aggregated.left
-                    lastPoint = self.detectionBuffer[-1].aggregated.left
+                self.detection_buffer.append(recheckData)
+                if len(self.detection_buffer) == self.detection_buffer_max_size:
+                    firstPoint = self.detection_buffer[0].aggregated.left
+                    lastPoint = self.detection_buffer[-1].aggregated.left
                     distMP = np.hypot(firstPoint.x - lastPoint.x, firstPoint.y - lastPoint.y)
 
-                    if distMP < self.searchStabilityThreshold:
+                    if distMP < self.search_stability_threshold:
                         distMPOF = np.hypot(lastPoint.x - self.tracking_data.aggregated.left.x, lastPoint.y - self.tracking_data.aggregated.left.y) 
-                        if distMPOF > self.recheckCorrectionThreshold:
+                        if distMPOF > self.max_diff_opticalflow_mediapipe:
                             self.tracking_data = recheckData
                             self.previous_frame_left, self.previous_frame_right = frameL.copy(), frameR.copy()
-                            self.trackingConfidence = self.confidenceInit
-                    self.detectionBuffer = []
+                            self.tracking_confidence_counter = self.tracking_confidence_init
+                    self.detection_buffer = []
             else:
-                self.detectionBuffer = []
+                self.detection_buffer = []
 
     def detect(self, frameL, frameR) -> TrackingData:
         centerL = Point2D()

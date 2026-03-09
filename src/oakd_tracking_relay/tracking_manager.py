@@ -183,7 +183,7 @@ class EyeTracker:
 
         # Debug Fenster für ROI Crop und Bewegung
         debug_frame = cv2.cvtColor(frame_left.copy(), cv2.COLOR_GRAY2BGR)
-        crop_left, offset_x_left, offset_y_left = self.utils.cropFrame(frame_left, center=center_left)
+        crop_left, offset_x_left, offset_y_left = self.utils.crop_frame(frame_left, center=center_left)
         height, width = crop_left.shape[:2]
         cv2.rectangle(debug_frame, (offset_x_left, offset_y_left), (offset_x_left + width, offset_y_left + height), (0,255,0), 2)
         if center_left is not None:
@@ -191,8 +191,8 @@ class EyeTracker:
         cv2.imshow("ROI Debug", debug_frame)
 
         # Frame Crop
-        crop_left, offset_x_left, offset_y_left = self.utils.cropFrame(frame_left, center_left)
-        crop_right, offset_x_right, offset_y_right = self.utils.cropFrame(frame_right, center_right)
+        crop_left, offset_x_left, offset_y_left = self.utils.crop_frame(frame_left, center_left)
+        crop_right, offset_x_right, offset_y_right = self.utils.crop_frame(frame_right, center_right)
 
         crop_left_rgb = cv2.cvtColor(crop_left, cv2.COLOR_GRAY2RGB)
         crop_right_rgb = cv2.cvtColor(crop_right, cv2.COLOR_GRAY2RGB)
@@ -207,7 +207,7 @@ class EyeTracker:
             LEFT_IRIS_INDICES = [468, 469, 470, 471, 472]
             RIGHT_IRIS_INDICES = [473, 474, 475, 476, 477]
 
-            best_face_id = self.utils.getBestFace(results_left, results_right)
+            best_face_id = self.utils.get_best_face(results_left, results_right)
             landmarks_left = results_left.multi_face_landmarks[best_face_id]
             landmarks_right = results_right.multi_face_landmarks[best_face_id]
 

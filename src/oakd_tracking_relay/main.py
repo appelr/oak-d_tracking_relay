@@ -1,7 +1,8 @@
 import time
 import concurrent.futures
 
-from oakd_tracking_relay.configuration_manager import Configuration, ConfigurationUI
+from oakd_tracking_relay.configuration_manager import Configuration
+from oakd_tracking_relay.ui_manager import ConfigurationUI
 from oakd_tracking_relay.camera_manager import OakDPro
 from oakd_tracking_relay.Utils import ProcessingUtils
 from oakd_tracking_relay.tracking_manager import *

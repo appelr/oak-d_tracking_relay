@@ -18,7 +18,7 @@ class EyeTracker:
         self.tracking_data = TrackingData()
         
         # MediaPipe FaceMesh 
-        self.model = mp.solutions.face_mesh.FaceMesh(
+        self.model = mp.solutions.face_mesh.FaceMesh( # type: ignore
             max_num_faces=4, 
             refine_landmarks=True, # Benötigt für Iris-Koordinaten
             static_image_mode=True, # Tracking-Infos ignorieren, da wir Optical Flow nutzen
@@ -95,13 +95,13 @@ class EyeTracker:
         right_points_right_cam = np.array([p.right.as_np() for p in self.tracking_data.right.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
 
         # Optical Flow auf Tracking Daten anwenden
-        next_left_points_left_cam, left_status_left_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frame_left, left_points_left_cam, None, **self.optical_flow_params)
+        next_left_points_left_cam, left_status_left_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frame_left, left_points_left_cam, None, **self.optical_flow_params) # type: ignore
 
-        next_left_points_right_cam, left_status_right_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frame_right, left_points_right_cam, None, **self.optical_flow_params)
+        next_left_points_right_cam, left_status_right_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frame_right, left_points_right_cam, None, **self.optical_flow_params) # type: ignore
 
-        next_right_points_left_cam, right_status_left_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frame_left, right_points_left_cam, None, **self.optical_flow_params)
+        next_right_points_left_cam, right_status_left_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frame_left, right_points_left_cam, None, **self.optical_flow_params) # type: ignore
 
-        next_right_points_right_cam, right_status_right_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frame_right, right_points_right_cam, None, **self.optical_flow_params)
+        next_right_points_right_cam, right_status_right_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frame_right, right_points_right_cam, None, **self.optical_flow_params) # type: ignore
 
         # Mindestanzahl Punkte muss über Schwellwert liegen um Tracking zu starten
         if len(left_points_left_cam) < self.min_tracking_points or len(right_points_left_cam) < self.min_tracking_points:
@@ -237,7 +237,7 @@ class EyeTracker:
 
 class HandTracker:
     def __init__(self, utils, config):
-        self.model = mp.solutions.hands.Hands( 
+        self.model = mp.solutions.hands.Hands(  # type: ignore
             max_num_hands=2,
             model_complexity=0,
             min_detection_confidence=float(config.confidence_percent/100),

@@ -23,8 +23,8 @@ class OakDPro:
             pass
         
         # Epoche bis PC-Start
-        self.reference_time = (time.time() - dai.Clock.now().total_seconds()) * 1000.0
-        self.sync_queue = self.device.getOutputQueue(name="sync_out", maxSize=1, blocking=False)
+        self.reference_time = (time.time() - dai.Clock.now().total_seconds()) * 1000.0 # type: ignore
+        self.sync_queue = self.device.getOutputQueue(name="sync_out", maxSize=1, blocking=False) # type: ignore
         self.control_queue = self.device.getInputQueue(name="control")
         self.device.setTimesync(timedelta(seconds=2.5), 20, True)
         return self
@@ -80,13 +80,15 @@ class OakDPro:
         
         try:
             # Dot Matrix führt zu schlechteren Detection Ergebnissen
-            self.device.setIrLaserDotProjectorIntensity(0.0)
-            self.device.setIrFloodLightIntensity(float(self.config.ir_laser_intensity_percent)/100)
+            if self.device is not None:
+                self.device.setIrLaserDotProjectorIntensity(0.0)
+                self.device.setIrFloodLightIntensity(float(self.config.ir_laser_intensity_percent)/100)
         except: 
             pass
 
     def get_stereo_frame(self):
-        frame_group = self.sync_queue.get()
+        if self.sync_queue is not None:
+            frame_group = self.sync_queue.get()
 
         if frame_group is not None:
             frame_left = frame_group["left"]

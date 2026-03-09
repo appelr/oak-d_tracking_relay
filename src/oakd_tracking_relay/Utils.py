@@ -69,6 +69,9 @@ class ProcessingUtils:
         self.prev_frame_time = 0.0
         self.smoothed_dt = 0.0
 
+        self.CROP_SCALE_NO_FACE = 0.6
+        self.CROP_SCALE_FACE = 0.4
+
     def stereo_point_to_pixel_coordinates(self, stereo_point: StereoPoint) -> StereoPoint: 
         left = self.point_to_pixel_coordinates(point=stereo_point.left)
         right = self.point_to_pixel_coordinates(point=stereo_point.right)
@@ -156,11 +159,11 @@ class ProcessingUtils:
 
         # Weniger Crop, wenn kein Gesicht gefunden wurde
         if not center.valid():
-            scale = 0.6
+            scale = self.CROP_SCALE_NO_FACE
             center_x = width // 2
             center_y = height // 2
         else:
-            scale = 0.4
+            scale = self.CROP_SCALE_FACE
             center_x = int(center.x)
             center_y = int(center.y)
 

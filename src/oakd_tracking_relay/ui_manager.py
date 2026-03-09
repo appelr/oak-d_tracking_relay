@@ -9,37 +9,44 @@ class ConfigurationUI:
     def __init__(self, camera: OakDPro, config: Configuration):
         self.config = config
         self.camera = camera
-        self.window_name = "Preview"
+        self.WINDOW_NAME = "Preview"
         self.display_frame = None
         self._create_ui_elements()
+
+        self.TRACKBAR_APPLY_CLAHE = "Apply CLAHE"
+        self.TRACKBAR_ISO = "ISO"
+        self.TRACKBAR_EXPOSURE = "Exposure"
+        self.TRACKBAR_IR_LASER = "IR Laser"
+        self.TRACKBAR_CONFIDENCE = "Min. Confidence"
 
     # Benötigtes callback für OpenCV Trackbar
     def _nothing(self, x):
         pass
 
     def _create_ui_elements(self):
-        cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
 
-        cv2.createTrackbar("Apply CLAHE", self.window_name, self.config.apply_clahe, 1, self._nothing)
-        cv2.setTrackbarMin("Apply CLAHE", self.window_name, 0)
-        cv2.setTrackbarMax("Apply CLAHE", self.window_name, 1)
+        cv2.namedWindow(self.WINDOW_NAME, cv2.WINDOW_NORMAL)
 
-        cv2.createTrackbar("ISO", self.window_name, self.config.iso, 1000, self._nothing)
-        cv2.setTrackbarMin("ISO", self.window_name, 100)
-        cv2.setTrackbarMax("ISO", self.window_name, 1000)
+        cv2.createTrackbar(self.TRACKBAR_APPLY_CLAHE, self.WINDOW_NAME, self.config.apply_clahe, 1, self._nothing)
+        cv2.setTrackbarMin(self.TRACKBAR_APPLY_CLAHE, self.WINDOW_NAME, 0)
+        cv2.setTrackbarMax(self.TRACKBAR_APPLY_CLAHE, self.WINDOW_NAME, 1)
 
-        cv2.createTrackbar("Exposure", self.window_name, self.config.exposure_us, 4000, self._nothing)
-        cv2.setTrackbarMin("Exposure", self.window_name, 50)
-        cv2.setTrackbarMax("Exposure", self.window_name, 9500)
+        cv2.createTrackbar(self.TRACKBAR_ISO, self.WINDOW_NAME, self.config.iso, 1000, self._nothing)
+        cv2.setTrackbarMin(self.TRACKBAR_ISO, self.WINDOW_NAME, 100)
+        cv2.setTrackbarMax(self.TRACKBAR_ISO, self.WINDOW_NAME, 1000)
+
+        cv2.createTrackbar(self.TRACKBAR_EXPOSURE, self.WINDOW_NAME, self.config.exposure_us, 4000, self._nothing)
+        cv2.setTrackbarMin(self.TRACKBAR_EXPOSURE, self.WINDOW_NAME, 50)
+        cv2.setTrackbarMax(self.TRACKBAR_EXPOSURE, self.WINDOW_NAME, 9500)
 
         # Über 90% kann unerwünschtes Verhalten auftreten
-        cv2.createTrackbar("IR Laser", self.window_name, self.config.ir_laser_intensity_percent, 0, self._nothing)
-        cv2.setTrackbarMin("IR Laser", self.window_name, 0)
-        cv2.setTrackbarMax("IR Laser", self.window_name, 90)
+        cv2.createTrackbar(self.TRACKBAR_IR_LASER, self.WINDOW_NAME, self.config.ir_laser_intensity_percent, 0, self._nothing)
+        cv2.setTrackbarMin(self.TRACKBAR_IR_LASER, self.WINDOW_NAME, 0)
+        cv2.setTrackbarMax(self.TRACKBAR_IR_LASER, self.WINDOW_NAME, 90)
 
-        cv2.createTrackbar("Min. Confidence", self.window_name, self.config.confidence_percent, 75, self._nothing)
-        cv2.setTrackbarMin("Min. Confidence", self.window_name, 20)
-        cv2.setTrackbarMax("Min. Confidence", self.window_name, 100)
+        cv2.createTrackbar(self.TRACKBAR_CONFIDENCE, self.WINDOW_NAME, self.config.confidence_percent, 75, self._nothing)
+        cv2.setTrackbarMin(self.TRACKBAR_CONFIDENCE, self.WINDOW_NAME, 20)
+        cv2.setTrackbarMax(self.TRACKBAR_CONFIDENCE, self.WINDOW_NAME, 100)
 
     def check_for_close_key(self):
         return cv2.waitKey(1) & 0xFF == ord("q")
@@ -53,15 +60,15 @@ class ConfigurationUI:
 
     def show(self):
         if self.display_frame is not None:
-            cv2.imshow(self.window_name, self.display_frame)
+            cv2.imshow(self.WINDOW_NAME, self.display_frame)
 
     def update_config_if_changed(self):
         new_values = {
-            "iso": cv2.getTrackbarPos("ISO", self.window_name),
-            "exposure_us": cv2.getTrackbarPos("Exposure", self.window_name),
-            "apply_clahe": cv2.getTrackbarPos("Apply CLAHE", self.window_name),
-            "ir_laser_intensity_percent": cv2.getTrackbarPos("IR Laser", self.window_name),
-            "confidence_percent": cv2.getTrackbarPos("Min. Confidence", self.window_name),
+            "iso": cv2.getTrackbarPos(self.TRACKBAR_ISO, self.WINDOW_NAME),
+            "exposure_us": cv2.getTrackbarPos(self.TRACKBAR_EXPOSURE, self.WINDOW_NAME),
+            "apply_clahe": cv2.getTrackbarPos(self.TRACKBAR_APPLY_CLAHE, self.WINDOW_NAME),
+            "ir_laser_intensity_percent": cv2.getTrackbarPos(self.TRACKBAR_IR_LASER, self.WINDOW_NAME),
+            "confidence_percent": cv2.getTrackbarPos(self.TRACKBAR_CONFIDENCE, self.WINDOW_NAME),
         }
 
         changed = False

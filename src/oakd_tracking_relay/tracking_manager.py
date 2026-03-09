@@ -43,7 +43,7 @@ class EyeTracker:
         # Optical Flow
         self.previous_frame_left = None
         self.previous_frame_right = None
-        self.optical_flow_params = dict(
+        self.OPTICAL_FLOW_PARAMS = dict(
             winSize=(8, 8), 
             maxLevel=5,
             criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 20, 0.03)
@@ -57,6 +57,9 @@ class EyeTracker:
 
         # Ab wievielen Punkten ist TrackingData valide
         self.min_tracking_points = 2
+
+        self.LEFT_IRIS_INDICES = [468, 469, 470, 471, 472]
+        self.RIGHT_IRIS_INDICES = [473, 474, 475, 476, 477]
 
     def process_stereo_frame(self, frame_left, frame_right):
         self.frame_count += 1
@@ -97,13 +100,13 @@ class EyeTracker:
         right_points_right_cam = np.array([p.right.as_np() for p in self.tracking_data.right.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
 
         # Optical Flow auf Tracking Daten anwenden
-        next_left_points_left_cam, left_status_left_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frame_left, left_points_left_cam, None, **self.optical_flow_params) # type: ignore
+        next_left_points_left_cam, left_status_left_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frame_left, left_points_left_cam, None, **self.OPTICAL_FLOW_PARAMS) # type: ignore
 
-        next_left_points_right_cam, left_status_right_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frame_right, left_points_right_cam, None, **self.optical_flow_params) # type: ignore
+        next_left_points_right_cam, left_status_right_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frame_right, left_points_right_cam, None, **self.OPTICAL_FLOW_PARAMS) # type: ignore
 
-        next_right_points_left_cam, right_status_left_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frame_left, right_points_left_cam, None, **self.optical_flow_params) # type: ignore
+        next_right_points_left_cam, right_status_left_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frame_left, right_points_left_cam, None, **self.OPTICAL_FLOW_PARAMS) # type: ignore
 
-        next_right_points_right_cam, right_status_right_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frame_right, right_points_right_cam, None, **self.optical_flow_params) # type: ignore
+        next_right_points_right_cam, right_status_right_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frame_right, right_points_right_cam, None, **self.OPTICAL_FLOW_PARAMS) # type: ignore
 
         # Mindestanzahl Punkte muss über Schwellwert liegen um Tracking zu starten
         if len(left_points_left_cam) < self.min_tracking_points or len(right_points_left_cam) < self.min_tracking_points:
@@ -207,19 +210,16 @@ class EyeTracker:
 
         # Augen-Landmark Detection
         if results_left.multi_face_landmarks and results_right.multi_face_landmarks:
-            LEFT_IRIS_INDICES = [468, 469, 470, 471, 472]
-            RIGHT_IRIS_INDICES = [473, 474, 475, 476, 477]
-
             best_face_id = self.utils.get_best_face(results_left=results_left, results_right=results_right)
             landmarks_left = results_left.multi_face_landmarks[best_face_id]
             landmarks_right = results_right.multi_face_landmarks[best_face_id]
 
-            for id in LEFT_IRIS_INDICES:
+            for id in self.LEFT_IRIS_INDICES:
                 left  = Point2D(offset_x_left + landmarks_left.landmark[id].x * crop_left.shape[1], offset_y_left + landmarks_left.landmark[id].y * crop_left.shape[0])
                 right = Point2D(offset_x_right + landmarks_right.landmark[id].x * crop_right.shape[1], offset_y_right + landmarks_right.landmark[id].y * crop_right.shape[0])
                 data.left.stereo_points.append(StereoPoint(left, right))
 
-            for id in RIGHT_IRIS_INDICES:
+            for id in self.RIGHT_IRIS_INDICES:
                 left  = Point2D(offset_x_left + landmarks_left.landmark[id].x * crop_left.shape[1], offset_y_left + landmarks_left.landmark[id].y * crop_left.shape[0])
                 right = Point2D(offset_x_right + landmarks_right.landmark[id].x * crop_right.shape[1], offset_y_right + landmarks_right.landmark[id].y * crop_right.shape[0])
                 data.right.stereo_points.append(StereoPoint(left, right))

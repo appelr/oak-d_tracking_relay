@@ -38,7 +38,6 @@ def main():
                 if frame_left is None or frame_right is None:
                     time.sleep(0.002)
                     print("Unvollständiges Stereo-Frame Paar - Skip")
-                    print()
                     continue
                 
                 # Frames rotieren und tauschen, da Kamera falschherum montiert ist
@@ -60,7 +59,6 @@ def main():
                             hand_upper_left, hand_lower_left, hand_upper_right, hand_lower_right = hand_tracking_task.result()
                         except Exception as e:
                             print(f"Fehler im asynchronen Hand-Thread: {e}")
-                            print()
 
                     hand_tracking_task = async_executor.submit(hand_tracker.process, frame_left.copy())
 

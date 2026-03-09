@@ -16,6 +16,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf"
 def main():
     config = Configuration.load_from_file(filename="config.json")
     udp_manager = UDPSender(config=config)
+    async_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     show_configuration_ui = True
 
     try:
@@ -27,7 +28,6 @@ def main():
             hand_tracker = HandTracker(utils=utils, config=config)
 
             # Hände asynchron, da nicht relevant für real time tracking
-            async_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
             hand_tracking_task = None
             hand_upper_left, hand_lower_left, hand_upper_right, hand_lower_right = False, False, False, False
 

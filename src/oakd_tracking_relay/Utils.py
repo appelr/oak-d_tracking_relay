@@ -70,8 +70,8 @@ class ProcessingUtils:
         self.smoothed_dt = 0.0
 
     def stereo_point_to_pixel_coordinates(self, stereo_point: StereoPoint) -> StereoPoint: 
-        left = self.point_to_pixel_coordinates(stereo_point.left)
-        right = self.point_to_pixel_coordinates(stereo_point.right)
+        left = self.point_to_pixel_coordinates(point=stereo_point.left)
+        right = self.point_to_pixel_coordinates(point=stereo_point.right)
 
         return StereoPoint(left, right)
 
@@ -122,8 +122,8 @@ class ProcessingUtils:
 
         for i, (face_left, face_right) in enumerate(zip(results_left.multi_face_landmarks,
                                         results_right.multi_face_landmarks)):
-            score_left = self._calculate_face_score(face_left)
-            score_right = self._calculate_face_score(face_right)
+            score_left = self._calculate_face_score(face_landmarks=face_left)
+            score_right = self._calculate_face_score(face_landmarks=face_right)
 
             # Stereo-Score = Mittelwert
             scores.append((i, (score_left + score_right) / 2))

@@ -24,7 +24,7 @@ class OakDPro:
         
         # Epoche bis PC-Start
         self.reference_time = (time.time() - dai.Clock.now().total_seconds()) * 1000.0 # type: ignore
-        self.sync_queue = self.device.getOutputQueue(name="sync_out", maxSize=1, blocking=False) # type: ignore
+        self.sync_queue = self.device.getOutputQueue("sync_out", 1, False) # type: ignore
         self.control_queue = self.device.getInputQueue(name="control")
         self.device.setTimesync(timedelta(seconds=2.5), 20, True)
         return self

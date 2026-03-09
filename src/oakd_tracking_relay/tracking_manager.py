@@ -4,6 +4,8 @@ import numpy as np
 import mediapipe as mp
 from enum import Enum, auto
 
+from oakd_tracking_relay.utils import ProcessingUtils
+from oakd_tracking_relay.configuration_manager import Configuration
 from oakd_tracking_relay.tracking_dto import *
 
 class TrackerState(Enum):
@@ -11,7 +13,7 @@ class TrackerState(Enum):
     TRACKING = auto()
 
 class EyeTracker:
-    def __init__(self, utils, config):
+    def __init__(self, utils: ProcessingUtils, config: Configuration):
         self.utils = utils
         self.config = config
         self.current_state = TrackerState.SEARCHING
@@ -65,7 +67,7 @@ class EyeTracker:
             self._track(frame_left=frame_left, frame_right=frame_right)
 
     def _detect(self, frame_left, frame_right):
-        detected_data = self._run_detection(frame_left, frame_right)
+        detected_data = self._run_detection(frame_left=frame_left, frame_right=frame_right)
 
         if detected_data.valid():
             self.detection_buffer.append(detected_data)
@@ -184,7 +186,7 @@ class EyeTracker:
 
         # Debug Fenster für ROI Crop und Bewegung
         debug_frame = cv2.cvtColor(frame_left.copy(), cv2.COLOR_GRAY2BGR)
-        crop_left, offset_x_left, offset_y_left = self.utils.crop_frame(frame_left, center=center_left)
+        crop_left, offset_x_left, offset_y_left = self.utils.crop_frame(frame=frame_left, center=center_left)
         height, width = crop_left.shape[:2]
         cv2.rectangle(debug_frame, (offset_x_left, offset_y_left), (offset_x_left + width, offset_y_left + height), (0,255,0), 2)
         if center_left is not None:
@@ -192,8 +194,8 @@ class EyeTracker:
         cv2.imshow("ROI Debug", debug_frame)
 
         # Frame Crop
-        crop_left, offset_x_left, offset_y_left = self.utils.crop_frame(frame_left, center_left)
-        crop_right, offset_x_right, offset_y_right = self.utils.crop_frame(frame_right, center_right)
+        crop_left, offset_x_left, offset_y_left = self.utils.crop_frame(frame=frame_left, center=center_left)
+        crop_right, offset_x_right, offset_y_right = self.utils.crop_frame(frame=frame_right, center=center_right)
 
         crop_left_rgb = cv2.cvtColor(crop_left, cv2.COLOR_GRAY2RGB)
         crop_right_rgb = cv2.cvtColor(crop_right, cv2.COLOR_GRAY2RGB)
@@ -208,7 +210,7 @@ class EyeTracker:
             LEFT_IRIS_INDICES = [468, 469, 470, 471, 472]
             RIGHT_IRIS_INDICES = [473, 474, 475, 476, 477]
 
-            best_face_id = self.utils.get_best_face(results_left, results_right)
+            best_face_id = self.utils.get_best_face(results_left=results_left, results_right=results_right)
             landmarks_left = results_left.multi_face_landmarks[best_face_id]
             landmarks_right = results_right.multi_face_landmarks[best_face_id]
 
@@ -236,7 +238,7 @@ class EyeTracker:
             self.current_state = TrackerState.SEARCHING
 
 class HandTracker:
-    def __init__(self, utils, config):
+    def __init__(self, utils: ProcessingUtils, config: Configuration):
         self.model = mp.solutions.hands.Hands(  # type: ignore
             max_num_hands=2,
             model_complexity=0,
@@ -268,7 +270,7 @@ class HandTracker:
         # Detection und Landmark-Verarbeitung
         if results.multi_hand_landmarks:
             for landmarks in results.multi_hand_landmarks:
-                landmark = self.utils.point_to_pixel_coordinates(Point2D(landmarks.landmark[9].x, landmarks.landmark[9].y))
+                landmark = self.utils.point_to_pixel_coordinates(point=Point2D(landmarks.landmark[9].x, landmarks.landmark[9].y))
                 
                 if landmark.x < half_width and landmark.y < half_height:
                     found_upper_left = True

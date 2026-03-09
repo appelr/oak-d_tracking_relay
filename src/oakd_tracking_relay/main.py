@@ -4,7 +4,7 @@ import concurrent.futures
 from oakd_tracking_relay.configuration_manager import Configuration
 from oakd_tracking_relay.ui_manager import ConfigurationUI
 from oakd_tracking_relay.camera_manager import OakDPro
-from oakd_tracking_relay.Utils import ProcessingUtils
+from oakd_tracking_relay.utils import ProcessingUtils
 from oakd_tracking_relay.tracking_manager import *
 from oakd_tracking_relay.tracking_dto import *
 from oakd_tracking_relay.udp_manager import UDPSender
@@ -14,7 +14,7 @@ import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf")
 
 def main():
-    config = Configuration.load_from_file("config.json")
+    config = Configuration.load_from_file(filename="config.json")
     udp_manager = UDPSender(config=config)
     show_configuration_ui = True
 

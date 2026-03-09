@@ -101,6 +101,7 @@ class ConfigurationUI:
                 cv2.circle(self.display_frame, (left_x, left_y), 5, (0, 255, 255), -1)
                 cv2.circle(self.display_frame, (right_x, right_y), 5, (0, 255, 0), -1)
 
-    def draw_data_rate(self, data_rate: float):
+    def draw_info(self):
         if self.display_frame is not None:
-            cv2.putText(self.display_frame, f"FPS: {int(data_rate)}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            cv2.putText(self.display_frame, f"'Q' druecken, um Highspeed Uebertragung zu starten", (10, 380), cv2.FONT_HERSHEY_DUPLEX, 0.7, (0, 127, 255), 2)
+

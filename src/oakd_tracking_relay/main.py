@@ -9,6 +9,10 @@ from oakd_tracking_relay.tracking_manager import *
 from oakd_tracking_relay.tracking_dto import *
 from oakd_tracking_relay.udp_manager import UDPSender
 
+# Protobuf deprrecated Warnung unterdrücken
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf")
+
 def main():
     config = Configuration.load_from_file("config.json")
     udp_manager = UDPSender(config=config)
@@ -34,6 +38,7 @@ def main():
                 if frame_left is None or frame_right is None:
                     time.sleep(0.002)
                     print("Unvollständiges Stereo-Frame Paar - Skip")
+                    print()
                     continue
                 
                 # Frames rotieren und tauschen, da Kamera falschherum montiert ist
@@ -55,10 +60,16 @@ def main():
                             hand_upper_left, hand_lower_left, hand_upper_right, hand_lower_right = hand_tracking_task.result()
                         except Exception as e:
                             print(f"Fehler im asynchronen Hand-Thread: {e}")
+                            print()
 
                     hand_tracking_task = async_executor.submit(hand_tracker.process, frame_left.copy())
 
                 data_rate = utils.get_data_rate()
+                if show_configuration_ui:
+                    print(f"Tracking mit ~{round(data_rate)} verarbeiteten Bildern pro Sekunde. Config schließen, um Datenrate weiter zu erhöhen!", flush=True, end="\r")
+                else:
+                    print(f"Tracking mit ~{round(data_rate)} verarbeiteten Bildern pro Sekunde.", flush=True, end="\r")
+
 
                 if eye_tracker.current_state == TrackerState.TRACKING and eye_tracker.tracking_data.valid():
                     iris_left_stereo = eye_tracker.tracking_data.left.aggregated
@@ -82,7 +93,7 @@ def main():
                         ui.change_display_frame(display_frame=frame_left)
                         ui.draw_eye_landmarks(tracking_data=eye_tracker.tracking_data)
                         ui.draw_hand_quadrants(upper_left=hand_upper_left, lower_left=hand_lower_left, upper_right=hand_upper_right, lower_right=hand_lower_right)
-                        ui.draw_data_rate(data_rate=data_rate)
+                        ui.draw_info()
                         ui.show()
     finally:
         async_executor.shutdown(wait=False)

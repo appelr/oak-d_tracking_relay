@@ -13,8 +13,8 @@ class Configuration:
     
     # Kamera
     fps: int = 100
-    iso: int = 1000
-    exposure_us: int = 4000
+    iso: int = 100
+    exposure_us: int = 400
     apply_clahe: int = 1
     ir_laser_intensity_percent: int = 100
     resolution_width: int = 640

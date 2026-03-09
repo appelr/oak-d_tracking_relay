@@ -19,7 +19,7 @@ def main():
             ui = ConfigurationUI(camera=camera, config=config)
 
             eye_tracker = EyeTracker(utils=utils, config=config)
-            hand_tracker = HandTracker(config=config)
+            hand_tracker = HandTracker(utils=utils, config=config)
 
             # Hände asynchron, da nicht relevant für real time tracking
             async_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
@@ -55,7 +55,7 @@ def main():
                         except Exception as e:
                             print(f"Fehler im asynchronen Hand-Thread: {e}")
 
-                    hand_tracking_task = async_executor.submit(hand_tracker.check_presence, frame_left.copy())
+                    hand_tracking_task = async_executor.submit(hand_tracker.process, frame_left.copy())
 
                 data_rate = utils.get_data_rate()
 

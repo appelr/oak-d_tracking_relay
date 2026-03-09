@@ -59,29 +59,22 @@ class EyeTracker:
         self.frame_count += 1
 
         if self.current_state == TrackerState.SEARCHING:
-            self._search(frame_left, frame_right)
+            self._detect(frame_left=frame_left, frame_right=frame_right)
         elif self.current_state == TrackerState.TRACKING:
-            self._track(frame_left, frame_right)
+            self._track(frame_left=frame_left, frame_right=frame_right)
 
-    def _decrease_confidence(self, amount=1):
-        self.tracking_confidence_counter -= amount
-        if self.tracking_confidence_counter <= self.tracking_confidence_minimum:
-            self.tracking_data = TrackingData()
-            self.detection_buffer = []
-            self.current_state = TrackerState.SEARCHING
+    def _detect(self, frame_left, frame_right):
+        detected_data = self._run_detection(frame_left, frame_right)
 
-    def _search(self, frame_left, frame_right):
-        detectedData = self.detect(frame_left, frame_right)
-
-        if detectedData.valid():
-            self.detection_buffer.append(detectedData)
+        if detected_data.valid():
+            self.detection_buffer.append(detected_data)
             
             if len(self.detection_buffer) == self.detection_buffer_max_size:
-                firstPoint = self.detection_buffer[0].aggregated.left
-                lastPoint = self.detection_buffer[-1].aggregated.left
-                dist = np.hypot(firstPoint.x - lastPoint.x, firstPoint.y - lastPoint.y)
+                first_point = self.detection_buffer[0].aggregated.left
+                last_point = self.detection_buffer[-1].aggregated.left
+                distance = np.hypot(first_point.x - last_point.x, first_point.y - last_point.y)
                 
-                if dist < self.search_stability_threshold:
+                if distance < self.search_stability_threshold:
                     self.tracking_data = self.detection_buffer[-1]
                     self.tracking_confidence_counter = self.tracking_confidence_init
                     self.detection_buffer = []
@@ -94,136 +87,155 @@ class EyeTracker:
         else:
             self.detection_buffer = []
 
-    def _track(self, frameL, frameR): 
-        leftPointsLeftCam = np.array([p.left.as_np() for p in self.tracking_data.left.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
-        leftPointsRightCam = np.array([p.right.as_np() for p in self.tracking_data.left.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
-        rightPointsLeftCam = np.array([p.left.as_np() for p in self.tracking_data.right.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
-        rightPointsRightCam = np.array([p.right.as_np() for p in self.tracking_data.right.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
+    def _track(self, frame_left, frame_right): 
+        left_points_left_cam = np.array([p.left.as_np() for p in self.tracking_data.left.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
+        left_points_right_cam = np.array([p.right.as_np() for p in self.tracking_data.left.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
+        right_points_left_cam = np.array([p.left.as_np() for p in self.tracking_data.right.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
+        right_points_right_cam = np.array([p.right.as_np() for p in self.tracking_data.right.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
 
-        nextLeftPointsLeftCam, leftStatusLeftCam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frameL, leftPointsLeftCam, None, **self.optical_flow_params)
-        nextLeftPointsRightCam, leftStatusRightCam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frameR, leftPointsRightCam, None, **self.optical_flow_params)
-        nextRightPointsLeftCam, rightStatusLeftCam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frameL, rightPointsLeftCam, None, **self.optical_flow_params)
-        nextRightPointsRightCam, rightStatusRightCam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frameR, rightPointsRightCam, None, **self.optical_flow_params)
+        # Optical Flow auf Tracking Daten anwenden
+        next_left_points_left_cam, left_status_left_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frame_left, left_points_left_cam, None, **self.optical_flow_params)
 
-        if len(leftPointsLeftCam) < self.min_tracking_points or len(rightPointsLeftCam) < self.min_tracking_points:
+        next_left_points_right_cam, left_status_right_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frame_right, left_points_right_cam, None, **self.optical_flow_params)
+
+        next_right_points_left_cam, right_status_left_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frame_left, right_points_left_cam, None, **self.optical_flow_params)
+
+        next_right_points_right_cam, right_status_right_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frame_right, right_points_right_cam, None, **self.optical_flow_params)
+
+        # Mindestanzahl Punkte muss über Schwellwert liegen um Tracking zu starten
+        if len(left_points_left_cam) < self.min_tracking_points or len(right_points_left_cam) < self.min_tracking_points:
             self._decrease_confidence(amount=2)
             return
 
         data = TrackingData()
 
-        for i in range(len(leftPointsLeftCam)):
-            if leftStatusLeftCam[i][0] == 1 and leftStatusRightCam[i][0] == 1:
-                leftNextL = Point2D(float(nextLeftPointsLeftCam[i][0][0]), float(nextLeftPointsLeftCam[i][0][1]))
-                leftNextR = Point2D(float(nextLeftPointsRightCam[i][0][0]), float(nextLeftPointsRightCam[i][0][1]))
-                data.left.stereo_points.append(StereoPoint(leftNextL, leftNextR))
+        # DTO erstellen
+        for i in range(len(left_points_left_cam)):
+            if left_status_left_cam[i][0] == 1 and left_status_right_cam[i][0] == 1:
+                next_left_point_left_cam = Point2D(float(next_left_points_left_cam[i][0][0]), float(next_left_points_left_cam[i][0][1]))
+                netx_left_point_right_cam = Point2D(float(next_left_points_right_cam[i][0][0]), float(next_left_points_right_cam[i][0][1]))
+                data.left.stereo_points.append(StereoPoint(next_left_point_left_cam, netx_left_point_right_cam))
 
-        for i in range(len(rightPointsLeftCam)):
-            if rightStatusLeftCam[i][0] == 1 and rightStatusRightCam[i][0] == 1:
-                rightNextL = Point2D(float(nextRightPointsLeftCam[i][0][0]), float(nextRightPointsLeftCam[i][0][1]))
-                rightNextR = Point2D(float(nextRightPointsRightCam[i][0][0]), float(nextRightPointsRightCam[i][0][1]))
-                data.right.stereo_points.append(StereoPoint(rightNextL, rightNextR))
+        for i in range(len(right_points_left_cam)):
+            if right_status_left_cam[i][0] == 1 and right_status_right_cam[i][0] == 1:
+                next_right_point_left_cam = Point2D(float(next_right_points_left_cam[i][0][0]), float(next_right_points_left_cam[i][0][1]))
+                next_right_point_right_cam = Point2D(float(next_right_points_right_cam[i][0][0]), float(next_right_points_right_cam[i][0][1]))
+                data.right.stereo_points.append(StereoPoint(next_right_point_left_cam, next_right_point_right_cam))
 
+        # Mindestanzahl getrackter Punkte muss über Schwellwert liegen
         if len(data.left.stereo_points) < self.min_tracking_points or len(data.right.stereo_points) < self.min_tracking_points:
             self._decrease_confidence(amount=2)
             return
 
+        # Zentrum der getrackten Punkte bestimmen (Iris)
         if data.valid():
             data.aggregate_median()
 
-        oldCenter = self.tracking_data.aggregated
-        newCenter = data.aggregated
-        distX = newCenter.left.x - oldCenter.left.x
-        distY = newCenter.left.y - oldCenter.left.y
-        prevDisp = oldCenter.left.x - oldCenter.right.x
-        currentDisp = newCenter.left.x - newCenter.right.x
+        old_center = self.tracking_data.aggregated
+        new_center = data.aggregated
+        distance_x = new_center.left.x - old_center.left.x
+        distance_y = new_center.left.y - old_center.left.y
+        previous_disparity = old_center.left.x - old_center.right.x
+        current_disparity = new_center.left.x - new_center.right.x
 
-        if np.hypot(distX, distY) > self.max_jump_between_frames or abs(currentDisp - prevDisp) > self.max_disparity_between_frames:
+        # Sprung zwischen Frames muss innerhalb des Schwellwertes liegen
+        if np.hypot(distance_x, distance_y) > self.max_jump_between_frames or abs(current_disparity - previous_disparity) > self.max_disparity_between_frames:
             self._decrease_confidence()
             return
         
         self.tracking_data = data
-        self.previous_frame_left, self.previous_frame_right = frameL.copy(), frameR.copy()
+        self.previous_frame_left, self.previous_frame_right = frame_left.copy(), frame_right.copy()
         self.tracking_confidence_counter = min(self.tracking_confidence_counter + 1, self.tracking_confidence_init)
     
-        # --- RECHECK ---
+        # Mediapipe Recheck, wenn Intervall erreicht wurde
         if self.frame_count % self.recheck_interval == 0 or len(self.detection_buffer) > 0:
-            recheckData = self.detect(frameL, frameR)
+            recheck_data = self._run_detection(frame_left=frame_left, frame_right=frame_right)
 
-            if recheckData.valid():
-                self.detection_buffer.append(recheckData)
+            if recheck_data.valid():
+                self.detection_buffer.append(recheck_data)
                 if len(self.detection_buffer) == self.detection_buffer_max_size:
-                    firstPoint = self.detection_buffer[0].aggregated.left
-                    lastPoint = self.detection_buffer[-1].aggregated.left
-                    distMP = np.hypot(firstPoint.x - lastPoint.x, firstPoint.y - lastPoint.y)
+                    first_bufffer_element = self.detection_buffer[0].aggregated.left
+                    last_buffer_element = self.detection_buffer[-1].aggregated.left
 
-                    if distMP < self.search_stability_threshold:
-                        distMPOF = np.hypot(lastPoint.x - self.tracking_data.aggregated.left.x, lastPoint.y - self.tracking_data.aggregated.left.y) 
-                        if distMPOF > self.max_diff_opticalflow_mediapipe:
-                            self.tracking_data = recheckData
-                            self.previous_frame_left, self.previous_frame_right = frameL.copy(), frameR.copy()
+                    distance = np.hypot(first_bufffer_element.x - last_buffer_element.x, first_bufffer_element.y - last_buffer_element.y)
+
+                    # Abweichung innerhalb der letzten x Detection-Daten muss innerhalb des Schwellwertes sein
+                    if distance < self.search_stability_threshold:
+                        distance_tracking_to_detection_data = np.hypot(last_buffer_element.x - self.tracking_data.aggregated.left.x, last_buffer_element.y - self.tracking_data.aggregated.left.y) 
+
+                        # Distanz zwischen Optical Flow und Mediapipe muss innerhalb des Schwellwertes sein
+                        if distance_tracking_to_detection_data > self.max_diff_opticalflow_mediapipe:
+                            self.tracking_data = recheck_data
+                            self.previous_frame_left, self.previous_frame_right = frame_left.copy(), frame_right.copy()
                             self.tracking_confidence_counter = self.tracking_confidence_init
                     self.detection_buffer = []
             else:
                 self.detection_buffer = []
 
-    def detect(self, frameL, frameR) -> TrackingData:
-        centerL = Point2D()
-        centerR = Point2D()
+    def _run_detection(self, frame_left, frame_right) -> TrackingData:
+        center_left = Point2D()
+        center_right = Point2D()
 
+        # Bildzentrum für crop auf letzte valide TrackingData setzen
         if self.tracking_data.valid():
-            centerL = self.tracking_data.aggregated.left
-            centerR = self.tracking_data.aggregated.right
+            center_left = self.tracking_data.aggregated.left
+            center_right = self.tracking_data.aggregated.right
 
-        # --- ROI Debug Window ---
-        debugFrameL = cv2.cvtColor(frameL.copy(), cv2.COLOR_GRAY2BGR)
-        cropL, offxL, offyL = self.utils.cropFrame(frameL, center=centerL)
-        h, w = cropL.shape[:2]
-        cv2.rectangle(debugFrameL, (offxL, offyL), (offxL + w, offyL + h), (0,255,0), 2)
-        if centerL is not None:
-            cv2.circle(debugFrameL, (int(centerL.x), int(centerL.y)), 5, (0,0,255), -1)
-        cv2.imshow("ROI Debug", debugFrameL)
-        # ------------------------
+        # Debug Fenster für ROI Crop und Bewegung
+        debug_frame = cv2.cvtColor(frame_left.copy(), cv2.COLOR_GRAY2BGR)
+        crop_left, offset_x_left, offset_y_left = self.utils.cropFrame(frame_left, center=center_left)
+        height, width = crop_left.shape[:2]
+        cv2.rectangle(debug_frame, (offset_x_left, offset_y_left), (offset_x_left + width, offset_y_left + height), (0,255,0), 2)
+        if center_left is not None:
+            cv2.circle(debug_frame, (int(center_left.x), int(center_left.y)), 5, (0,0,255), -1)
+        cv2.imshow("ROI Debug", debug_frame)
 
-        cropL, offxL, offyL = self.utils.cropFrame(frameL, centerL)
-        cropR, offxR, offyR = self.utils.cropFrame(frameR, centerR)
+        # Frame Crop
+        crop_left, offset_x_left, offset_y_left = self.utils.cropFrame(frame_left, center_left)
+        crop_right, offset_x_right, offset_y_right = self.utils.cropFrame(frame_right, center_right)
 
-        cropLRGB = cv2.cvtColor(cropL, cv2.COLOR_GRAY2RGB)
-        cropRRGB = cv2.cvtColor(cropR, cv2.COLOR_GRAY2RGB)
+        crop_left_rgb = cv2.cvtColor(crop_left, cv2.COLOR_GRAY2RGB)
+        crop_right_rgb = cv2.cvtColor(crop_right, cv2.COLOR_GRAY2RGB)
 
-        resultsL = self.model.process(cropLRGB)
-        resultsR = self.model.process(cropRRGB)
+        results_left = self.model.process(crop_left_rgb)
+        results_right = self.model.process(crop_right_rgb)
 
         data = TrackingData()
 
-        if resultsL.multi_face_landmarks and resultsR.multi_face_landmarks:
-            leftIrisIndices = [468, 469, 470, 471, 472]
-            rightIrisIndices = [473, 474, 475, 476, 477]
+        # Augen-Landmark Detection
+        if results_left.multi_face_landmarks and results_right.multi_face_landmarks:
+            LEFT_IRIS_INDICES = [468, 469, 470, 471, 472]
+            RIGHT_IRIS_INDICES = [473, 474, 475, 476, 477]
 
-            bestFaceId = self.utils.getBestFace(resultsL, resultsR)
-            landmarksL = resultsL.multi_face_landmarks[bestFaceId]
-            landmarksR = resultsR.multi_face_landmarks[bestFaceId]
+            best_face_id = self.utils.getBestFace(results_left, results_right)
+            landmarks_left = results_left.multi_face_landmarks[best_face_id]
+            landmarks_right = results_right.multi_face_landmarks[best_face_id]
 
-            for idx in leftIrisIndices:
-                left  = Point2D(offxL + landmarksL.landmark[idx].x * cropL.shape[1], offyL + landmarksL.landmark[idx].y * cropL.shape[0])
-                right = Point2D(offxR + landmarksR.landmark[idx].x * cropR.shape[1], offyR + landmarksR.landmark[idx].y * cropR.shape[0])
+            for id in LEFT_IRIS_INDICES:
+                left  = Point2D(offset_x_left + landmarks_left.landmark[id].x * crop_left.shape[1], offset_y_left + landmarks_left.landmark[id].y * crop_left.shape[0])
+                right = Point2D(offset_x_right + landmarks_right.landmark[id].x * crop_right.shape[1], offset_y_right + landmarks_right.landmark[id].y * crop_right.shape[0])
                 data.left.stereo_points.append(StereoPoint(left, right))
 
-            for idx in rightIrisIndices:
-                left  = Point2D(offxL + landmarksL.landmark[idx].x * cropL.shape[1], offyL + landmarksL.landmark[idx].y * cropL.shape[0])
-                right = Point2D(offxR + landmarksR.landmark[idx].x * cropR.shape[1], offyR + landmarksR.landmark[idx].y * cropR.shape[0])
+            for id in RIGHT_IRIS_INDICES:
+                left  = Point2D(offset_x_left + landmarks_left.landmark[id].x * crop_left.shape[1], offset_y_left + landmarks_left.landmark[id].y * crop_left.shape[0])
+                right = Point2D(offset_x_right + landmarks_right.landmark[id].x * crop_right.shape[1], offset_y_right + landmarks_right.landmark[id].y * crop_right.shape[0])
                 data.right.stereo_points.append(StereoPoint(left, right))
-
+            
+            # Zentrum der gefundenen Punkte bestimmen (Iris)
             if data.valid():
                 data.aggregate_median()
 
         return data
+    
+    def _decrease_confidence(self, amount=1):
+        self.tracking_confidence_counter -= amount
+        if self.tracking_confidence_counter <= self.tracking_confidence_minimum:
+            self.tracking_data = TrackingData()
+            self.detection_buffer = []
+            self.current_state = TrackerState.SEARCHING
 
-
-# =========================================================================================
-# HAND TRACKER (Unabhängige Quadranten-Logik)
-# =========================================================================================
 class HandTracker:
-    def __init__(self, config):
+    def __init__(self, utils, config):
         self.model = mp.solutions.hands.Hands( 
             max_num_hands=2,
             model_complexity=0,
@@ -231,54 +243,57 @@ class HandTracker:
             min_tracking_confidence=float(config.confidence_percent/100)
         )
         self.config = config
+        self.utils = utils
         
+        # Toleranz für Fehlklassifizierung von fehlenden Handpositionen
         self.patience = 5
-        self.missing_oben_links = self.patience
-        self.missing_unten_links = self.patience
-        self.missing_oben_rechts = self.patience
-        self.missing_unten_rechts = self.patience
+        self.missing_upper_left = self.patience
+        self.missing_lower_left = self.patience
+        self.missing_upper_right = self.patience
+        self.missing_lower_right = self.patience
 
-    def check_presence(self, frameL):
-        frame_rgb = cv2.cvtColor(frameL, cv2.COLOR_GRAY2RGB)
+    def process(self, frame):
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
         results = self.model.process(frame_rgb)
         
-        found_ol = False
-        found_ul = False
-        found_or = False
-        found_ur = False
+        found_upper_left = False
+        found_lower_left = False
+        found_upper_right = False
+        found_lower_right = False
         
         half_width = self.config.resolution_width / 2
         half_height = self.config.resolution_height / 2
         
+        # Detection und Landmark-Verarbeitung
         if results.multi_hand_landmarks:
             for landmarks in results.multi_hand_landmarks:
-                x_pixel = landmarks.landmark[9].x * self.config.resolution_width
-                y_pixel = landmarks.landmark[9].y * self.config.resolution_height
+                landmark = self.utils.point_to_pixel_coordinates(Point2D(landmarks.landmark[9].x, landmarks.landmark[9].y))
                 
-                if x_pixel < half_width and y_pixel < half_height:
-                    found_ol = True
-                elif x_pixel < half_width and y_pixel >= half_height:
-                    found_ul = True
-                elif x_pixel >= half_width and y_pixel < half_height:
-                    found_or = True
-                elif x_pixel >= half_width and y_pixel >= half_height:
-                    found_ur = True
+                if landmark.x < half_width and landmark.y < half_height:
+                    found_upper_left = True
+                elif landmark.x < half_width and landmark.y >= half_height:
+                    found_lower_left = True
+                elif landmark.x >= half_width and landmark.y < half_height:
+                    found_upper_right = True
+                elif landmark.x >= half_width and landmark.y >= half_height:
+                    found_lower_right = True
 
-        if found_ol: self.missing_oben_links = 0
-        else: self.missing_oben_links += 1
+        # Anpassen der Patience
+        if found_upper_left: self.missing_upper_left = 0
+        else: self.missing_upper_left += 1
             
-        if found_ul: self.missing_unten_links = 0
-        else: self.missing_unten_links += 1
+        if found_lower_left: self.missing_lower_left = 0
+        else: self.missing_lower_left += 1
 
-        if found_or: self.missing_oben_rechts = 0
-        else: self.missing_oben_rechts += 1
+        if found_upper_right: self.missing_upper_right = 0
+        else: self.missing_upper_right += 1
             
-        if found_ur: self.missing_unten_rechts = 0
-        else: self.missing_unten_rechts += 1
+        if found_lower_right: self.missing_lower_right = 0
+        else: self.missing_lower_right += 1
 
-        is_oben_links = self.missing_oben_links < self.patience
-        is_unten_links = self.missing_unten_links < self.patience
-        is_oben_rechts = self.missing_oben_rechts < self.patience
-        is_unten_rechts = self.missing_unten_rechts < self.patience
+        upper_left = self.missing_upper_left < self.patience
+        lower_left = self.missing_lower_left < self.patience
+        upper_right = self.missing_upper_right < self.patience
+        lower_right = self.missing_lower_right < self.patience
         
-        return is_oben_links, is_unten_links, is_oben_rechts, is_unten_rechts
+        return upper_left, lower_left, upper_right, lower_right

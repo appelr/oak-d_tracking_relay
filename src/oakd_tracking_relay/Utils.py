@@ -70,12 +70,12 @@ class ProcessingUtils:
         self.smoothed_dt = 0.0
 
     def stereo_point_to_pixel_coordinates(self, stereo_point: StereoPoint) -> StereoPoint: 
-        left = self._point_to_pixel_coordinates(stereo_point.left)
-        right = self._point_to_pixel_coordinates(stereo_point.right)
+        left = self.point_to_pixel_coordinates(stereo_point.left)
+        right = self.point_to_pixel_coordinates(stereo_point.right)
 
         return StereoPoint(left, right)
 
-    def _point_to_pixel_coordinates(self, point: Point2D) -> Point2D:
+    def point_to_pixel_coordinates(self, point: Point2D) -> Point2D:
         x = float(point.x * self.config.resolution_width)
         y = float(point.y * self.config.resolution_height)
 

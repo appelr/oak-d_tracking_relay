@@ -30,3 +30,4 @@ dependencies = [
 
 [project.scripts]
 start-tracking = "oakd_tracking_relay.main:main"
+start-simulation = "oakd_tracking_relay.simulation:main"

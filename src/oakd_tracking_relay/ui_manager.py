@@ -9,15 +9,18 @@ class ConfigurationUI:
     def __init__(self, camera: OakDPro, config: Configuration):
         self.config = config
         self.camera = camera
-        self.WINDOW_NAME = "Preview"
         self.display_frame = None
-        self._create_ui_elements()
 
+        self.WINDOW_NAME = "Preview"
         self.TRACKBAR_APPLY_CLAHE = "Apply CLAHE"
         self.TRACKBAR_ISO = "ISO"
         self.TRACKBAR_EXPOSURE = "Exposure"
         self.TRACKBAR_IR_LASER = "IR Laser"
         self.TRACKBAR_CONFIDENCE = "Min. Confidence"
+        
+        self._create_ui_elements()
+
+       
 
     # Benötigtes callback für OpenCV Trackbar
     def _nothing(self, x):

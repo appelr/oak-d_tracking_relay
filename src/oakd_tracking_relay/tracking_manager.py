@@ -52,7 +52,7 @@ class EyeTracker:
         # Schwellwerte für Sprünge zwischen Mediapipe und OpticalFlow
         self.SEARCH_STABILITY_THRESHOLD = 20
         self.MAX_DIFF_OPTICALFLOW_MEDIAPIPE = 1.5
-        self.MAX_JUMP_BETWEEN_FRAMES = 35
+        self.MAX_EYE_JUMP_BETWEEN_FRAMES = 35
         self.MAX_DISPARITY_BETWEEN_FRAMES = 10
         self.MAX_EYE_DISTANCE_DIFFERENCE_BETWEEN_FRAMES = 20
 
@@ -139,20 +139,11 @@ class EyeTracker:
             data.aggregate_median()
 
         # Plausibilitätscheck zwischen 2 aufeinanderfolgenden Frames
-        old_data = self.tracking_data
-        new_data = data
+        eye_jump_between_frames_left, eye_jump_between_frames_right = self.utils.get_eye_jumps_between_frames(previous_data=self.tracking_data, new_data=data)
+        disparity = self.utils.get_disparity_between_frames(previous_data=self.tracking_data, new_data=data)
+        eye_distance_between_frames = self.utils.get_eye_distance_between_frames(previous_data=self.tracking_data, new_data=data)
 
-        distance_x = new_data.aggregated.left.x - old_data.aggregated.left.x
-        distance_y = new_data.aggregated.left.y - old_data.aggregated.left.y
-
-        previous_disparity = old_data.aggregated.left.x - old_data.aggregated.right.x
-        current_disparity = new_data.aggregated.left.x - new_data.aggregated.right.x
-
-        previous_eye_distance = self.utils.get_eye_distance(old_data)
-        current_eye_distance = self.utils.get_eye_distance(new_data)
-
-
-        if np.hypot(distance_x, distance_y) > self.MAX_JUMP_BETWEEN_FRAMES or abs(current_disparity - previous_disparity) > self.MAX_DISPARITY_BETWEEN_FRAMES or abs(previous_eye_distance - current_eye_distance) > self.MAX_EYE_DISTANCE_DIFFERENCE_BETWEEN_FRAMES:
+        if eye_jump_between_frames_left > self.MAX_EYE_JUMP_BETWEEN_FRAMES or eye_jump_between_frames_right > self.MAX_EYE_JUMP_BETWEEN_FRAMES or disparity > self.MAX_DISPARITY_BETWEEN_FRAMES or eye_distance_between_frames > self.MAX_EYE_DISTANCE_DIFFERENCE_BETWEEN_FRAMES:
             self._decrease_confidence()
             return
         

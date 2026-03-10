@@ -184,3 +184,8 @@ class ProcessingUtils:
         frame_right = self.clahe.apply(frame_right)
 
         return frame_left, frame_right
+    
+    def get_eye_distance(self, data: TrackingData):
+        left = data.left.aggregated.left
+        right = data.right.aggregated.left
+        return np.hypot(right.x - left.x, right.y - left.y)

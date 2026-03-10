@@ -34,11 +34,11 @@ class EyeTracker:
 
         # Schwellwerte für Wechsel Searching -> Tracking
         self.detection_buffer = []
-        self.detection_buffer_max_size = 2
+        self.DETECTION_BUFFER_MAX_SIZE = 2
 
         # Counter für Mediapipe Recheck
         self.frame_count = 0
-        self.recheck_interval = 15
+        self.RECHECK_INTERVAL = 15
 
         # Optical Flow
         self.previous_frame_left = None
@@ -50,13 +50,14 @@ class EyeTracker:
         )
 
         # Schwellwerte für Sprünge zwischen Mediapipe und OpticalFlow
-        self.search_stability_threshold = 20
-        self.max_diff_opticalflow_mediapipe = 1.5
-        self.max_jump_between_frames = 35
-        self.max_disparity_between_frames = 10
+        self.SEARCH_STABILITY_THRESHOLD = 20
+        self.MAX_DIFF_OPTICALFLOW_MEDIAPIPE = 1.5
+        self.MAX_JUMP_BETWEEN_FRAMES = 35
+        self.MAX_DISPARITY_BETWEEN_FRAMES = 10
+        self.MAX_EYE_DISTANCE_DIFFERENCE_BETWEEN_FRAMES = 20
 
         # Ab wievielen Punkten ist TrackingData valide
-        self.min_tracking_points = 2
+        self.MIN_TRACKING_POINTS = 2
 
         self.LEFT_IRIS_INDICES = [468, 469, 470, 471, 472]
         self.RIGHT_IRIS_INDICES = [473, 474, 475, 476, 477]
@@ -75,12 +76,12 @@ class EyeTracker:
         if detected_data.valid():
             self.detection_buffer.append(detected_data)
             
-            if len(self.detection_buffer) == self.detection_buffer_max_size:
+            if len(self.detection_buffer) == self.DETECTION_BUFFER_MAX_SIZE:
                 first_point = self.detection_buffer[0].aggregated.left
                 last_point = self.detection_buffer[-1].aggregated.left
                 distance = np.hypot(first_point.x - last_point.x, first_point.y - last_point.y)
                 
-                if distance < self.search_stability_threshold:
+                if distance < self.SEARCH_STABILITY_THRESHOLD:
                     self.tracking_data = self.detection_buffer[-1]
                     self.tracking_confidence_counter = self.tracking_confidence_init
                     self.detection_buffer = []
@@ -109,7 +110,7 @@ class EyeTracker:
         next_right_points_right_cam, right_status_right_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frame_right, right_points_right_cam, None, **self.OPTICAL_FLOW_PARAMS) # type: ignore
 
         # Mindestanzahl Punkte muss über Schwellwert liegen um Tracking zu starten
-        if len(left_points_left_cam) < self.min_tracking_points or len(right_points_left_cam) < self.min_tracking_points:
+        if len(left_points_left_cam) < self.MIN_TRACKING_POINTS or len(right_points_left_cam) < self.MIN_TRACKING_POINTS:
             self._decrease_confidence(amount=2)
             return
 
@@ -129,7 +130,7 @@ class EyeTracker:
                 data.right.stereo_points.append(StereoPoint(next_right_point_left_cam, next_right_point_right_cam))
 
         # Mindestanzahl getrackter Punkte muss über Schwellwert liegen
-        if len(data.left.stereo_points) < self.min_tracking_points or len(data.right.stereo_points) < self.min_tracking_points:
+        if len(data.left.stereo_points) < self.MIN_TRACKING_POINTS or len(data.right.stereo_points) < self.MIN_TRACKING_POINTS:
             self._decrease_confidence(amount=2)
             return
 
@@ -137,15 +138,21 @@ class EyeTracker:
         if data.valid():
             data.aggregate_median()
 
-        old_center = self.tracking_data.aggregated
-        new_center = data.aggregated
-        distance_x = new_center.left.x - old_center.left.x
-        distance_y = new_center.left.y - old_center.left.y
-        previous_disparity = old_center.left.x - old_center.right.x
-        current_disparity = new_center.left.x - new_center.right.x
+        # Plausibilitätscheck zwischen 2 aufeinanderfolgenden Frames
+        old_data = self.tracking_data
+        new_data = data
 
-        # Sprung zwischen Frames muss innerhalb des Schwellwertes liegen
-        if np.hypot(distance_x, distance_y) > self.max_jump_between_frames or abs(current_disparity - previous_disparity) > self.max_disparity_between_frames:
+        distance_x = new_data.aggregated.left.x - old_data.aggregated.left.x
+        distance_y = new_data.aggregated.left.y - old_data.aggregated.left.y
+
+        previous_disparity = old_data.aggregated.left.x - old_data.aggregated.right.x
+        current_disparity = new_data.aggregated.left.x - new_data.aggregated.right.x
+
+        previous_eye_distance = self.utils.get_eye_distance(old_data)
+        current_eye_distance = self.utils.get_eye_distance(new_data)
+
+
+        if np.hypot(distance_x, distance_y) > self.MAX_JUMP_BETWEEN_FRAMES or abs(current_disparity - previous_disparity) > self.MAX_DISPARITY_BETWEEN_FRAMES or abs(previous_eye_distance - current_eye_distance) > self.MAX_EYE_DISTANCE_DIFFERENCE_BETWEEN_FRAMES:
             self._decrease_confidence()
             return
         
@@ -154,23 +161,24 @@ class EyeTracker:
         self.tracking_confidence_counter = min(self.tracking_confidence_counter + 1, self.tracking_confidence_init)
     
         # Mediapipe Recheck, wenn Intervall erreicht wurde
-        if self.frame_count % self.recheck_interval == 0 or len(self.detection_buffer) > 0:
+        if self.frame_count % self.RECHECK_INTERVAL == 0 or len(self.detection_buffer) > 0:
             recheck_data = self._run_detection(frame_left=frame_left, frame_right=frame_right)
 
             if recheck_data.valid():
                 self.detection_buffer.append(recheck_data)
-                if len(self.detection_buffer) == self.detection_buffer_max_size:
+
+                if len(self.detection_buffer) == self.DETECTION_BUFFER_MAX_SIZE:
                     first_bufffer_element = self.detection_buffer[0].aggregated.left
                     last_buffer_element = self.detection_buffer[-1].aggregated.left
 
                     distance = np.hypot(first_bufffer_element.x - last_buffer_element.x, first_bufffer_element.y - last_buffer_element.y)
 
                     # Abweichung innerhalb der letzten x Detection-Daten muss innerhalb des Schwellwertes sein
-                    if distance < self.search_stability_threshold:
+                    if distance < self.SEARCH_STABILITY_THRESHOLD:
                         distance_tracking_to_detection_data = np.hypot(last_buffer_element.x - self.tracking_data.aggregated.left.x, last_buffer_element.y - self.tracking_data.aggregated.left.y) 
 
                         # Distanz zwischen Optical Flow und Mediapipe muss innerhalb des Schwellwertes sein
-                        if distance_tracking_to_detection_data > self.max_diff_opticalflow_mediapipe:
+                        if distance_tracking_to_detection_data > self.MAX_DIFF_OPTICALFLOW_MEDIAPIPE:
                             self.tracking_data = recheck_data
                             self.previous_frame_left, self.previous_frame_right = frame_left.copy(), frame_right.copy()
                             self.tracking_confidence_counter = self.tracking_confidence_init
@@ -187,16 +195,6 @@ class EyeTracker:
             center_left = self.tracking_data.aggregated.left
             center_right = self.tracking_data.aggregated.right
 
-        # Debug Fenster für ROI Crop und Bewegung
-        debug_frame = cv2.cvtColor(frame_left.copy(), cv2.COLOR_GRAY2BGR)
-        crop_left, offset_x_left, offset_y_left = self.utils.crop_frame(frame=frame_left, center=center_left)
-        height, width = crop_left.shape[:2]
-        cv2.rectangle(debug_frame, (offset_x_left, offset_y_left), (offset_x_left + width, offset_y_left + height), (0,255,0), 2)
-        if center_left is not None:
-            cv2.circle(debug_frame, (int(center_left.x), int(center_left.y)), 5, (0,0,255), -1)
-        cv2.imshow("ROI Debug", debug_frame)
-
-        # Frame Crop
         crop_left, offset_x_left, offset_y_left = self.utils.crop_frame(frame=frame_left, center=center_left)
         crop_right, offset_x_right, offset_y_right = self.utils.crop_frame(frame=frame_right, center=center_right)
 

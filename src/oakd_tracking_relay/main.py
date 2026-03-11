@@ -43,9 +43,9 @@ def main():
                     continue
                 
                 # Frames rotieren und tauschen, da Kamera falschherum montiert ist
-                # frame_left = cv2.rotate(frame_left, cv2.ROTATE_180)
-                # frame_right = cv2.rotate(frame_right, cv2.ROTATE_180)
-                # frame_left, frame_right = frame_right, frame_left
+                frame_left = cv2.rotate(frame_left, cv2.ROTATE_180)
+                frame_right = cv2.rotate(frame_right, cv2.ROTATE_180)
+                frame_left, frame_right = frame_right, frame_left
 
                 frame_left, frame_right = utils.rectify_stereo_frame(frame_left=frame_left, frame_right=frame_right)
                 
@@ -78,8 +78,8 @@ def main():
                     iris_right_3D = utils.triangulate_stereo_point(stereo_point=iris_right_stereo)
 
                     # Y-Invertieren, um der Unity-Welt zu entsprechen
-                    iris_left_3D.y = -iris_left_3D.y
-                    iris_right_3D.y = -iris_right_3D.y
+                    # iris_left_3D.y = -iris_left_3D.y
+                    # iris_right_3D.y = -iris_right_3D.y
 
                     # Letzter Guard - Prüft, ob Augen realistische Distanz haben
                     if np.abs(iris_left_3D.z - iris_right_3D.z) < MAX_EYE_DEPTH_DIFFERENCE_MM:
@@ -96,6 +96,15 @@ def main():
                         ui.update_config_if_changed()
                         ui.change_display_frame(display_frame=frame_left)
                         ui.draw_eye_landmarks(tracking_data=eye_tracker.tracking_data)
+                        
+                        if eye_tracker.current_state == TrackerState.TRACKING and eye_tracker.tracking_data.valid():
+                            iris_left_stereo = eye_tracker.tracking_data.left.aggregated
+                            iris_right_stereo = eye_tracker.tracking_data.right.aggregated
+                            iris_left_3D = utils.triangulate_stereo_point(stereo_point=iris_left_stereo)
+                            iris_right_3D = utils.triangulate_stereo_point(stereo_point=iris_right_stereo)
+                            ui.draw_coordinates(iris_left_3D, "left", 300)
+                            ui.draw_coordinates(iris_right_3D, "right", 330)
+
                         ui.draw_hand_quadrants(upper_left=hand_upper_left, lower_left=hand_lower_left, upper_right=hand_upper_right, lower_right=hand_lower_right)
                         ui.draw_info()
                         ui.show()

@@ -79,8 +79,8 @@ def main():
 
                     # Y-Invertieren, um der Unity-Welt zu entsprechen
                     # print(iris_left_3D.y)
-                    iris_left_3D.y = iris_left_3D.y * -1
-                    iris_right_3D.y = -iris_right_3D.y * -1
+                    iris_left_3D.y = -iris_left_3D.y
+                    iris_right_3D.y = -iris_right_3D.y
 
                     # Letzter Guard - Prüft, ob Augen realistische Distanz haben
                     if np.abs(iris_left_3D.z - iris_right_3D.z) < MAX_EYE_DEPTH_DIFFERENCE_MM:
@@ -103,8 +103,8 @@ def main():
                             iris_right_stereo = eye_tracker.tracking_data.right.aggregated
                             iris_left_3D = utils.triangulate_stereo_point(stereo_point=iris_left_stereo)
                             iris_right_3D = utils.triangulate_stereo_point(stereo_point=iris_right_stereo)
-                            iris_left_3D.y = iris_left_3D.y * -1
-                            iris_right_3D.y = -iris_right_3D.y * -1
+                            iris_left_3D.y = -iris_left_3D.y
+                            iris_right_3D.y = -iris_right_3D.y
                             ui.draw_coordinates(iris_left_3D, "left", 300)
                             ui.draw_coordinates(iris_right_3D, "right", 330)
 

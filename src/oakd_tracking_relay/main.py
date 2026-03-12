@@ -43,9 +43,9 @@ def main():
                     continue
                 
                 # Frames rotieren und tauschen, da Kamera falschherum montiert ist
-                frame_left = cv2.rotate(frame_left, cv2.ROTATE_180)
-                frame_right = cv2.rotate(frame_right, cv2.ROTATE_180)
-                frame_left, frame_right = frame_right, frame_left
+                # frame_left = cv2.rotate(frame_left, cv2.ROTATE_180)
+                # frame_right = cv2.rotate(frame_right, cv2.ROTATE_180)
+                # frame_left, frame_right = frame_right, frame_left
 
                 frame_left, frame_right = utils.rectify_stereo_frame(frame_left=frame_left, frame_right=frame_right)
                 

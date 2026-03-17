@@ -246,6 +246,9 @@ class HandTracker:
 
     def process(self, frame):
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
+
+        # Frame flip, da Resultate sonst gespiegelt sind
+        frame_rgb = cv2.flip(frame_rgb, 1)
         results = self.model.process(frame_rgb)
         
         found_upper_left = False

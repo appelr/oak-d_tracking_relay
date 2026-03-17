@@ -114,11 +114,3 @@ class ConfigurationUI:
     def draw_info(self):
         if self.display_frame is not None:
             cv2.putText(self.display_frame, f"'Q' druecken, um Highspeed Uebertragung zu starten", (10, 380), cv2.FONT_HERSHEY_DUPLEX, 0.7, (0, 127, 255), 2)
-
-    def draw_coordinates(self, point: Point3D, name, position):
-        if self.display_frame is not None:
-            if name == "left":
-                cv2.putText(self.display_frame, f"{name} - x: {round(point.x)}, y: {round(point.y)}, z: {round(point.z)}",(10, position), cv2.FONT_HERSHEY_DUPLEX, 0.7, (0, 255, 255), 2)
-            else:
-                cv2.putText(self.display_frame, f"{name} - x: {round(point.x)}, y: {round(point.y)}, z: {round(point.z)}",(10, position), cv2.FONT_HERSHEY_DUPLEX, 0.7, (0, 255, 0), 2)
-

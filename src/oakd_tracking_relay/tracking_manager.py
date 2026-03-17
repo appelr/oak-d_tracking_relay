@@ -172,8 +172,8 @@ class EyeTracker:
                         if distance_tracking_to_detection_data > self.MAX_DIFF_OPTICALFLOW_MEDIAPIPE:
                             self.tracking_data = recheck_data
                             self.previous_frame_left, self.previous_frame_right = frame_left.copy(), frame_right.copy()
-                            self.tracking_confidence_counter = self.tracking_confidence_init
-                    self.detection_buffer = []
+                            #self.tracking_confidence_counter = self.tracking_confidence_init
+                    self.detection_buffer.pop(0)
             else:
                 self.detection_buffer = []
 

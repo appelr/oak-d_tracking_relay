@@ -56,6 +56,7 @@ def main():
                             hand_upper_left, hand_lower_left, hand_upper_right, hand_lower_right = hand_tracking_task.result()
                         except Exception as e:
                             print(f"Fehler im asynchronen Hand-Thread: {e}")
+                            hand_upper_left, hand_lower_left, hand_upper_right, hand_lower_right = False, False, False, False
 
                     hand_tracking_task = async_executor.submit(hand_tracker.process, frame_left.copy())
 

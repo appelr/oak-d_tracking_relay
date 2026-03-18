@@ -1,4 +1,4 @@
-Flowchart
+stateDiagram
     direction TB
     
     [*] --> Init
@@ -6,59 +6,56 @@ Flowchart
 
     state "System Loop" as System_Loop {
         direction TB
-        state "Run Preprocessing" as Preprocessing
-        state "Get Stereo Frame" as get_stereo_frame
-        state "Processing Fork" as processing_fork
-        state "MediaPipe Detect Eyes" as MediaPipe_Face
-        state "Validate Landmarks" as Validate_Landmarks
-        state "Add to Buffer" as Add_To_Buffer
-        state "MediaPipe Detect Hands" as Run_MediaPipe_Hands
-        state "Map to Quadrants" as Map_to_Quadranten
+        state "Stereo Frame abfragen" as get_stereo_frame
+        state "Preprocessing" as processing_fork
+        state "MediaPipe Augen-Erkennung" as MediaPipe_Face
+        state "Landmarks validieren" as Validate_Landmarks
+        state "Buffer befüllen" as Add_To_Buffer
+        state "MediaPipe Hand-Erkennung" as Run_MediaPipe_Hands
+        state "Quadranten zuweisen" as Map_to_Quadranten
         state "Optical Flow" as Optical_Flow_PyrLK
-        state "Validate Movement" as Validate_Movement
-        state "Send via UDP" as Send_UDP
-        state "Display Frame and Tracking Data" as Update_UI
+        state "Bewegung validieren" as Validate_Movement
+        state "Senden via UDP" as Send_UDP
+        state "Frame und Tracking-Daten anzeigen" as Update_UI
 
-
-        get_stereo_frame --> Preprocessing
-        Preprocessing --> processing_fork
+        get_stereo_frame --> processing_fork
         
         state processing_fork <<fork>>
         
-        state "Eye Tracker (Main Thread)" as EyeTracker {
+        state "Augen-Tracker (Haupt Thread)" as EyeTracker {
             direction LR
             
-            state "SEARCHING (Initial State)" as Search {
+            state "Zustand: SEARCHING (initial)" as Search {
                 MediaPipe_Face --> Validate_Landmarks
                 Validate_Landmarks --> Add_To_Buffer
                 
             }
             
-            state "TRACKING" as Track {
+            state "Zustand: TRACKING" as Track {
                 Optical_Flow_PyrLK --> Validate_Movement
                 
-                state "Periodic Recheck (MediaPipe)" as Recheck
-                Validate_Movement --> Recheck : Revalidate every x frames
-                Recheck --> Validate_Movement : Correct drift
+                state "Periodischer Recheck (MediaPipe)" as Recheck
+                Validate_Movement --> Recheck : Alle x Frames rechecken
+                Recheck --> Validate_Movement : Drift korrigieren
             }
             
-            Search --> Track : Buffer contains enough valid landmarks
-            Track --> Search : Optical Flow unsuccessful or drift detected
+            Search --> Track : Buffer beinhaltet genug valide Landmarks
+            Track --> Search : Optical Flow fehlgeschlagen oder Drift
         }
         
-        state "Hand Tracker (Background Thread)" as HandTracker {
+        state "Han-Tracker (Background Thread)" as HandTracker {
             direction TB
             Run_MediaPipe_Hands --> Map_to_Quadranten
         }
         
         processing_fork --> EyeTracker
-        processing_fork --> HandTracker : Send to background thread
+        processing_fork --> HandTracker : An background thread senden
         
         state Tracking_Join <<join>>
         
         EyeTracker --> Triangulate
-        Triangulate --> Tracking_Join : 3D Coordinates
-        HandTracker --> Tracking_Join : Async Result
+        Triangulate --> Tracking_Join : 3D Koordinaten
+        HandTracker --> Tracking_Join : Async Ergebnis
         
         Tracking_Join --> Validate
         Validate --> Send_UDP

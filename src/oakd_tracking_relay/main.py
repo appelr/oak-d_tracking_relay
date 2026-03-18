@@ -101,11 +101,12 @@ def main():
 
             except Exception as e:
                     print(f"Kamera-Fehler aufgetreten, versuche Neustart: {e}")
+                    ui.exit()
                     time.sleep(2)
 
     except KeyboardInterrupt:
         print("Programm beendet durch Nutzer")
-        
+
     finally:
         print("Cleanup..")
         async_executor.shutdown(wait=False)

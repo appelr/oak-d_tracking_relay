@@ -30,11 +30,13 @@ class UDPSender:
             self._send_data(data=data, port=self.config.udp_port_eyes)
 
     def send_hands(self, upper_left: bool, lower_left: bool, upper_right: bool, lower_right: bool, timestamp: float):
+            
+            # Vertauschen von links und rechts, um Unity Welt zu entsprechen 
             data = {"ts": timestamp, "hands": {}}
-            data["hands"]["Left Up"] = upper_left
-            data["hands"]["Left Down"] = lower_left
-            data["hands"]["Right Up"] = upper_right
-            data["hands"]["Right Down"] = lower_right
+            data["hands"]["Left Up"] = upper_right
+            data["hands"]["Left Down"] = lower_right
+            data["hands"]["Right Up"] = upper_left
+            data["hands"]["Right Down"] = lower_left
             
             self._send_data(data=data, port=self.config.udp_port_hands)
 

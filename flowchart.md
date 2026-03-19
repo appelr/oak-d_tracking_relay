@@ -16,7 +16,8 @@ stateDiagram
         state "Optical Flow" as Optical_Flow_PyrLK
         state "Bewegung validieren" as Validate_Movement
         state "Senden via UDP" as Send_UDP
-        state "Frame und Tracking-Daten anzeigen" as Update_UI
+        state "UI mit Preview und Konfigurations-Slidern" as Update_UI
+        state "Update Konfiguration" as config_update
 
         get_stereo_frame --> processing_fork
         
@@ -43,7 +44,7 @@ stateDiagram
             Track --> Search : Optical Flow fehlgeschlagen oder Drift
         }
         
-        state "Han-Tracker (Background Thread)" as HandTracker {
+        state "Hand-Tracker (Background Thread)" as HandTracker {
             direction TB
             Run_MediaPipe_Hands --> Map_to_Quadranten
         }
@@ -58,7 +59,13 @@ stateDiagram
         HandTracker --> Tracking_Join : Async Ergebnis
         
         Tracking_Join --> Validate
-        Validate --> Send_UDP
-        Send_UDP --> Update_UI
-        Update_UI --> get_stereo_frame
+        Validate --> Send_UDP : Daten valide
+        
+        state GUI_Condition <<choice>>
+        Send_UDP --> GUI_Condition
+        
+        GUI_Condition --> Update_UI : GUI aktiviert
+        Update_UI --> config_update : Konfigurations-Daten
+        config_update --> get_stereo_frame : Neue Kamera Konfiguration
+        GUI_Condition --> get_stereo_frame : GUI deaktiviert (bessere Verarbeitungsrate)
     }

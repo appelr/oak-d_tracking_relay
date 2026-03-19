@@ -64,6 +64,7 @@ def main():
                             hand_tracking_task = async_executor.submit(hand_tracker.process, frame_left.copy())
 
                         data_rate = utils.get_data_rate()
+                        
                         if show_configuration_ui:
                             print(f"Tracking mit ~{round(data_rate)} verarbeiteten Bildern pro Sekunde. Config schließen, um Datenrate weiter zu erhöhen!", flush=True, end="\r")
                         else:

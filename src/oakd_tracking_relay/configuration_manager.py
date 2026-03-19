@@ -32,15 +32,17 @@ class Configuration:
                 print(f"Config in Datei {filename} gespeichert: {data}", flush=True)
         except Exception as e:
             print(f"Konnte Datei {filename} nicht speichern: {e}", flush=True)
-
+    
     @classmethod
     def load_from_file(cls, filename="config.json"):
         config = cls()
         
+        # Wenn Config Datei noch nicht existiert: Neue erstellen und mit default Werten befüllen
         if not os.path.exists(filename):
-            print(f"Datei nicht gefunden: {filename}", flush=True)
-            raise FileNotFoundError(filename)
-
+            print(f"Datei nicht gefunden: {filename}. Erstelle...", flush=True)
+            config.save_to_file(filename=filename)
+            return config 
+        
         try:
             with open(filename, 'r') as f:
                 data = json.load(f)
@@ -56,4 +58,3 @@ class Configuration:
             raise e
             
         return config
-    

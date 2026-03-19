@@ -18,6 +18,7 @@ stateDiagram
         state "Senden via UDP" as Send_UDP
         state "UI mit Preview und Konfigurations-Slidern" as Update_UI
         state "Update Konfiguration" as config_update
+        state "Tiefeninformationen berechnen" as Triangulate
 
         get_stereo_frame --> processing_fork
         

@@ -90,7 +90,7 @@ class EyeTracker:
                     # WICHTIG: Bilder für den kommenden Optical Flow speichern!
                     self.previous_frame_left, self.previous_frame_right = frame_left.copy(), frame_right.copy()
                 else:
-                    self.detection_buffer.pop(0)
+                    self.detection_buffer = []
         else:
             self.detection_buffer = []
 
@@ -173,7 +173,7 @@ class EyeTracker:
                             self.tracking_data = recheck_data
                             self.previous_frame_left, self.previous_frame_right = frame_left.copy(), frame_right.copy()
                             #self.tracking_confidence_counter = self.tracking_confidence_init
-                    self.detection_buffer.pop(0)
+                    self.detection_buffer = []
             else:
                 self.detection_buffer = []
 

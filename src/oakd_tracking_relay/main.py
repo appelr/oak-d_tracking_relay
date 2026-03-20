@@ -27,7 +27,8 @@ def main():
             try:
                 with OakDPro(config=config) as camera:
                     utils = ProcessingUtils(camera=camera, config=config)
-                    ui = ConfigurationUI(camera=camera, config=config)
+                    if show_configuration_ui:
+                        ui = ConfigurationUI(camera=camera, config=config)
 
                     eye_tracker = EyeTracker(utils=utils, config=config)
                     hand_tracker = HandTracker(utils=utils, config=config)
@@ -102,7 +103,9 @@ def main():
 
             except Exception as e:
                     print(f"Kamera-Fehler aufgetreten, versuche Neustart: {e}")
-                    ui.exit()
+                    if show_configuration_ui:
+                        ui.exit()
+
                     time.sleep(2)
 
     except KeyboardInterrupt:

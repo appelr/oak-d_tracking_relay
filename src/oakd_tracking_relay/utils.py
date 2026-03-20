@@ -73,8 +73,8 @@ class ProcessingUtils:
         self.CROP_SCALE_FACE = 0.4
 
     def stereo_point_to_pixel_coordinates(self, stereo_point: StereoPoint) -> StereoPoint: 
-        left = self.point_to_pixel_coordinates(point=stereo_point.left)
-        right = self.point_to_pixel_coordinates(point=stereo_point.right)
+        left = self.point_to_pixel_coordinates(point=stereo_point.left_cam)
+        right = self.point_to_pixel_coordinates(point=stereo_point.right_cam)
 
         return StereoPoint(left, right)
 
@@ -91,8 +91,8 @@ class ProcessingUtils:
         return left, right
     
     def triangulate_stereo_point(self, stereo_point: StereoPoint) -> Point3D:
-        left = stereo_point.left.as_np()
-        right = stereo_point.right.as_np()
+        left = stereo_point.left_cam.as_np()
+        right = stereo_point.right_cam.as_np()
 
         points_4D = cv2.triangulatePoints(self.projection_left, self.projection_right, left, right)
         points_3D = points_4D[:3] / points_4D[3:]

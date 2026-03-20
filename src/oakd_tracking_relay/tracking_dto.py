@@ -28,60 +28,60 @@ class Point3D:
     
 @dataclass
 class StereoPoint:
-    left: Point2D = field(default_factory=Point2D)
-    right: Point2D = field(default_factory=Point2D)
+    left_cam: Point2D = field(default_factory=Point2D)
+    right_cam: Point2D = field(default_factory=Point2D)
 
     def valid(self) -> bool:
-        return self.left.valid() and self.right.valid()
+        return self.left_cam.valid() and self.right_cam.valid()
     
 @dataclass
-class StereoPointCluster:
+class EyeStereoPointCluster:
     MIN_TRACKING_POINTS = 2
     stereo_points: List[StereoPoint] = field(default_factory=list)
-    aggregated: StereoPoint = field(default_factory=StereoPoint)
+    iris: StereoPoint = field(default_factory=StereoPoint)
 
     def valid(self) -> bool:
         return len(self.stereo_points) > self.MIN_TRACKING_POINTS
 
     def aggregate_median(self):
-        left_points = [p.left.as_np() for p in self.stereo_points if p.left.valid()]
-        right_points = [p.right.as_np() for p in self.stereo_points if p.right.valid()]
+        left_points = [p.left_cam.as_np() for p in self.stereo_points if p.left_cam.valid()]
+        right_points = [p.right_cam.as_np() for p in self.stereo_points if p.right_cam.valid()]
 
         if left_points:
             median = np.median(left_points, axis=0)
-            self.aggregated.left = Point2D(*median)
+            self.iris.left_cam = Point2D(*median)
 
         if right_points:
             median = np.median(right_points, axis=0)
-            self.aggregated.right = Point2D(*median)
+            self.iris.right_cam = Point2D(*median)
 
 @dataclass
-class TrackingData:
-    left: StereoPointCluster = field(default_factory=StereoPointCluster)
-    right: StereoPointCluster = field(default_factory=StereoPointCluster)
-    aggregated: StereoPoint = field(default_factory=StereoPoint)
+class HeadTrackingData:
+    left_eye: EyeStereoPointCluster = field(default_factory=EyeStereoPointCluster)
+    right_eye: EyeStereoPointCluster = field(default_factory=EyeStereoPointCluster)
+    center_between_eyes: StereoPoint = field(default_factory=StereoPoint)
 
     def valid(self) -> bool: 
-        return self.left.valid() and self.right.valid()
+        return self.left_eye.valid() and self.right_eye.valid()
     
     def aggregate_median(self):
         left_cam_points = []
         right_cam_points = []
 
-        if self.left.valid():
-            self.left.aggregate_median()
-            left_cam_points.append(self.left.aggregated.left.as_np())
-            right_cam_points.append(self.left.aggregated.right.as_np())
+        if self.left_eye.valid():
+            self.left_eye.aggregate_median()
+            left_cam_points.append(self.left_eye.iris.left_cam.as_np())
+            right_cam_points.append(self.left_eye.iris.right_cam.as_np())
 
-        if self.right.valid():
-            self.right.aggregate_median()
-            left_cam_points.append(self.right.aggregated.left.as_np())
-            right_cam_points.append(self.right.aggregated.right.as_np())
+        if self.right_eye.valid():
+            self.right_eye.aggregate_median()
+            left_cam_points.append(self.right_eye.iris.left_cam.as_np())
+            right_cam_points.append(self.right_eye.iris.right_cam.as_np())
 
         if left_cam_points:
             median_left = np.median(left_cam_points, axis=0)
-            self.aggregated.left = Point2D(*median_left)
+            self.center_between_eyes.left_cam = Point2D(*median_left)
 
         if right_cam_points:
             median_right = np.median(right_cam_points, axis=0)
-            self.aggregated.right = Point2D(*median_right)
+            self.center_between_eyes.right_cam = Point2D(*median_right)

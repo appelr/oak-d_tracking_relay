@@ -103,10 +103,10 @@ class ConfigurationUI:
 
             cv2.addWeighted(overlay, 0.3, self.display_frame, 0.7, 0, self.display_frame)
 
-    def draw_eye_landmarks(self, tracking_data: TrackingData):
+    def draw_eye_landmarks(self, tracking_data: HeadTrackingData):
         if tracking_data.valid():
-            left_x, left_y = int(tracking_data.left.aggregated.left.x), int(tracking_data.left.aggregated.left.y)
-            right_x, right_y = int(tracking_data.right.aggregated.left.x), int(tracking_data.right.aggregated.left.y)
+            left_x, left_y = int(tracking_data.left_eye.iris.left_cam.x), int(tracking_data.left_eye.iris.left_cam.y)
+            right_x, right_y = int(tracking_data.right_eye.iris.left_cam.x), int(tracking_data.right_eye.iris.left_cam.y)
             if self.display_frame is not None:
                 cv2.circle(self.display_frame, (left_x, left_y), 5, (0, 255, 255), -1)
                 cv2.circle(self.display_frame, (right_x, right_y), 5, (0, 255, 0), -1)

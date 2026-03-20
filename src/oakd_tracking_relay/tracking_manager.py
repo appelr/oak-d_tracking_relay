@@ -17,7 +17,7 @@ class EyeTracker:
         self.utils = utils
         self.config = config
         self.current_state = TrackerState.SEARCHING
-        self.tracking_data = TrackingData()
+        self.tracking_data = HeadTrackingData()
         
         # MediaPipe FaceMesh 
         self.model = mp.solutions.face_mesh.FaceMesh( # type: ignore
@@ -33,7 +33,7 @@ class EyeTracker:
         self.tracking_confidence_minimum = 0
 
         # Schwellwerte für Wechsel Searching -> Tracking
-        self.detection_buffer = []
+        self.detection_buffer: list[HeadTrackingData] = []        
         self.DETECTION_BUFFER_MAX_SIZE = 2
 
         # Counter für Mediapipe Recheck
@@ -68,18 +68,18 @@ class EyeTracker:
             self._track(frame_left=frame_left, frame_right=frame_right)
     
     def _is_detection_stable(self):
-        first_left = self.detection_buffer[0].aggregated.left
-        last_left = self.detection_buffer[-1].aggregated.left
-        first_right = self.detection_buffer[0].aggregated.right
-        last_right = self.detection_buffer[-1].aggregated.right
+        first_left = self.detection_buffer[0].center_between_eyes.left_cam
+        last_left = self.detection_buffer[-1].center_between_eyes.left_cam
+        first_right = self.detection_buffer[0].center_between_eyes.right_cam
+        last_right = self.detection_buffer[-1].center_between_eyes.right_cam
         return np.hypot(first_left.x - last_left.x, first_left.y - last_left.y) < self.SEARCH_STABILITY_THRESHOLD and np.hypot(first_right.x - last_right.x, first_right.y - last_right.y) < self.SEARCH_STABILITY_THRESHOLD
     
-    def _is_tracking_deviating_from_detection(self, recheck_data: TrackingData):
-        tracking_point_left = self.tracking_data.aggregated.left
-        tracking_point_right = self.tracking_data.aggregated.right
+    def _is_tracking_deviating_from_detection(self, recheck_data: HeadTrackingData):
+        tracking_point_left = self.tracking_data.center_between_eyes.left_cam
+        tracking_point_right = self.tracking_data.center_between_eyes.right_cam
 
-        recheck_data_left = recheck_data.aggregated.left
-        recheck_data_right = recheck_data.aggregated.right
+        recheck_data_left = recheck_data.center_between_eyes.left_cam
+        recheck_data_right = recheck_data.center_between_eyes.right_cam
 
         distance_left = np.hypot(
             recheck_data_left.x - tracking_point_left.x,
@@ -104,24 +104,25 @@ class EyeTracker:
             eye_dist <= self.MAX_EYE_DISTANCE_DIFFERENCE_BETWEEN_FRAMES
         )
     
-    def _get_eye_jumps_between_frames(self, previous_data: TrackingData, new_data: TrackingData):
-        distance_x_left_eye = new_data.aggregated.left.x - previous_data.aggregated.left.x
-        distance_y_left_eye = new_data.aggregated.left.y - previous_data.aggregated.left.y
-        distance_x_right_eye = new_data.aggregated.right.x - previous_data.aggregated.right.x
-        distance_y_right_eye = new_data.aggregated.right.y - previous_data.aggregated.right.y
+    def _get_eye_jumps_between_frames(self, previous_data: HeadTrackingData, new_data: HeadTrackingData):
+        distance_x_left_eye = new_data.left_eye.iris.left_cam.x - previous_data.left_eye.iris.left_cam.x
+        distance_y_left_eye = new_data.left_eye.iris.left_cam.y - previous_data.left_eye.iris.left_cam.y
+        distance_x_right_eye = new_data.right_eye.iris.left_cam.x - previous_data.right_eye.iris.left_cam.x
+        distance_y_right_eye = new_data.right_eye.iris.left_cam.y - previous_data.right_eye.iris.left_cam.y
 
         return np.hypot(distance_x_left_eye, distance_y_left_eye), np.hypot(distance_x_right_eye, distance_y_right_eye)
 
-    def _get_disparity_between_frames(self, previous_data: TrackingData, new_data: TrackingData):
-        previous_disparity = previous_data.aggregated.left.x - previous_data.aggregated.right.x
-        current_disparity = new_data.aggregated.left.x - new_data.aggregated.right.x
+    def _get_disparity_between_frames(self, previous_data: HeadTrackingData, new_data: HeadTrackingData):
+        previous_disparity = previous_data.center_between_eyes.left_cam.x - previous_data.center_between_eyes.right_cam.x
+        current_disparity = new_data.center_between_eyes.left_cam.x - new_data.center_between_eyes.right_cam.x
 
         return abs(current_disparity - previous_disparity)
     
-    def _get_eye_distance_between_frames(self, previous_data: TrackingData, new_data: TrackingData):
-        previous_eye_distance = np.hypot(previous_data.aggregated.right.x - previous_data.aggregated.left.x, previous_data.aggregated.right.y - previous_data.aggregated.left.y)
-        current_eye_distance = np.hypot(new_data.aggregated.right.x - new_data.aggregated.left.x, new_data.aggregated.right.y - new_data.aggregated.left.y)
-        
+    def _get_eye_distance_between_frames(self, previous_data: HeadTrackingData, new_data: HeadTrackingData):
+        previous_eye_distance = np.hypot(previous_data.left_eye.iris.left_cam.x - previous_data.right_eye.iris.left_cam.x, previous_data.left_eye.iris.left_cam.y - previous_data.right_eye.iris.left_cam.y)
+
+        current_eye_distance = np.hypot(new_data.left_eye.iris.left_cam.x - new_data.right_eye.iris.left_cam.x, new_data.left_eye.iris.left_cam.y - new_data.right_eye.iris.left_cam.y)
+
         return abs(previous_eye_distance - current_eye_distance)
     
     def _reset_detection_buffer(self):
@@ -140,7 +141,7 @@ class EyeTracker:
     def _decrease_confidence(self, amount=1):
         self.tracking_confidence_counter -= amount
         if self.tracking_confidence_counter <= self.tracking_confidence_minimum:
-            self.tracking_data = TrackingData()
+            self.tracking_data = HeadTrackingData()
             self._reset_detection_buffer()
             self.current_state = TrackerState.SEARCHING
 
@@ -167,10 +168,10 @@ class EyeTracker:
 
     def _track(self, frame_left, frame_right): 
         # Optical Flow auf Tracking Daten anwenden
-        left_points_left_cam = np.array([p.left.as_np() for p in self.tracking_data.left.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
-        left_points_right_cam = np.array([p.right.as_np() for p in self.tracking_data.left.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
-        right_points_left_cam = np.array([p.left.as_np() for p in self.tracking_data.right.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
-        right_points_right_cam = np.array([p.right.as_np() for p in self.tracking_data.right.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
+        left_points_left_cam = np.array([p.left_cam.as_np() for p in self.tracking_data.left_eye.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
+        left_points_right_cam = np.array([p.right_cam.as_np() for p in self.tracking_data.left_eye.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
+        right_points_left_cam = np.array([p.left_cam.as_np() for p in self.tracking_data.right_eye.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
+        right_points_right_cam = np.array([p.right_cam.as_np() for p in self.tracking_data.right_eye.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
 
         next_left_points_left_cam, left_status_left_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frame_left, left_points_left_cam, None, **self.OPTICAL_FLOW_PARAMS) # type: ignore
 
@@ -180,20 +181,20 @@ class EyeTracker:
 
         next_right_points_right_cam, right_status_right_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frame_right, right_points_right_cam, None, **self.OPTICAL_FLOW_PARAMS) # type: ignore
 
-        data = TrackingData()
+        data = HeadTrackingData()
 
         # DTO erstellen und befüllen
         for i in range(len(left_points_left_cam)):
             if left_status_left_cam[i][0] == 1 and left_status_right_cam[i][0] == 1:
                 next_left_point_left_cam = Point2D(float(next_left_points_left_cam[i][0][0]), float(next_left_points_left_cam[i][0][1]))
                 netx_left_point_right_cam = Point2D(float(next_left_points_right_cam[i][0][0]), float(next_left_points_right_cam[i][0][1]))
-                data.left.stereo_points.append(StereoPoint(next_left_point_left_cam, netx_left_point_right_cam))
+                data.left_eye.stereo_points.append(StereoPoint(next_left_point_left_cam, netx_left_point_right_cam))
 
         for i in range(len(right_points_left_cam)):
             if right_status_left_cam[i][0] == 1 and right_status_right_cam[i][0] == 1:
                 next_right_point_left_cam = Point2D(float(next_right_points_left_cam[i][0][0]), float(next_right_points_left_cam[i][0][1]))
                 next_right_point_right_cam = Point2D(float(next_right_points_right_cam[i][0][0]), float(next_right_points_right_cam[i][0][1]))
-                data.right.stereo_points.append(StereoPoint(next_right_point_left_cam, next_right_point_right_cam))
+                data.right_eye.stereo_points.append(StereoPoint(next_right_point_left_cam, next_right_point_right_cam))
 
         # Zentrum der getrackten Punkte bestimmen (Iris)
         if data.valid():
@@ -233,14 +234,14 @@ class EyeTracker:
             else:
                 self._reset_detection_buffer()
 
-    def _run_detection(self, frame_left, frame_right) -> TrackingData:
+    def _run_detection(self, frame_left, frame_right) -> HeadTrackingData:
         center_left = Point2D()
         center_right = Point2D()
 
         # Bildzentrum für crop auf letzte valide TrackingData setzen
         if self.tracking_data.valid():
-            center_left = self.tracking_data.aggregated.left
-            center_right = self.tracking_data.aggregated.right
+            center_left = self.tracking_data.center_between_eyes.left_cam
+            center_right = self.tracking_data.center_between_eyes.right_cam
 
         crop_left, offset_x_left, offset_y_left = self.utils.crop_frame(frame=frame_left, center=center_left)
         crop_right, offset_x_right, offset_y_right = self.utils.crop_frame(frame=frame_right, center=center_right)
@@ -251,7 +252,7 @@ class EyeTracker:
         results_left = self.model.process(crop_left_rgb)
         results_right = self.model.process(crop_right_rgb)
 
-        data = TrackingData()
+        data = HeadTrackingData()
 
         # Augen-Landmark Detection
         if results_left.multi_face_landmarks and results_right.multi_face_landmarks:
@@ -262,12 +263,12 @@ class EyeTracker:
             for id in self.LEFT_IRIS_INDICES:
                 left  = Point2D(offset_x_left + landmarks_left.landmark[id].x * crop_left.shape[1], offset_y_left + landmarks_left.landmark[id].y * crop_left.shape[0])
                 right = Point2D(offset_x_right + landmarks_right.landmark[id].x * crop_right.shape[1], offset_y_right + landmarks_right.landmark[id].y * crop_right.shape[0])
-                data.left.stereo_points.append(StereoPoint(left, right))
+                data.left_eye.stereo_points.append(StereoPoint(left, right))
 
             for id in self.RIGHT_IRIS_INDICES:
                 left  = Point2D(offset_x_left + landmarks_left.landmark[id].x * crop_left.shape[1], offset_y_left + landmarks_left.landmark[id].y * crop_left.shape[0])
                 right = Point2D(offset_x_right + landmarks_right.landmark[id].x * crop_right.shape[1], offset_y_right + landmarks_right.landmark[id].y * crop_right.shape[0])
-                data.right.stereo_points.append(StereoPoint(left, right))
+                data.right_eye.stereo_points.append(StereoPoint(left, right))
             
             # Zentrum der gefundenen Punkte bestimmen (Iris)
             if data.valid():

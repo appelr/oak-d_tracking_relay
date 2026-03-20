@@ -73,8 +73,8 @@ def main():
 
 
                         if eye_tracker.current_state == TrackerState.TRACKING and eye_tracker.tracking_data.valid():
-                            iris_left_stereo = eye_tracker.tracking_data.left.aggregated
-                            iris_right_stereo = eye_tracker.tracking_data.right.aggregated
+                            iris_left_stereo = eye_tracker.tracking_data.left_eye.iris
+                            iris_right_stereo = eye_tracker.tracking_data.right_eye.iris
                             iris_left_3D = utils.triangulate_stereo_point(stereo_point=iris_left_stereo)
                             iris_right_3D = utils.triangulate_stereo_point(stereo_point=iris_right_stereo)
 

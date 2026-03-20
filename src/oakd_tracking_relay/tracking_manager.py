@@ -66,6 +66,83 @@ class EyeTracker:
             self._detect(frame_left=frame_left, frame_right=frame_right)
         elif self.current_state == TrackerState.TRACKING:
             self._track(frame_left=frame_left, frame_right=frame_right)
+    
+    def _is_detection_stable(self):
+        first_left = self.detection_buffer[0].aggregated.left
+        last_left = self.detection_buffer[-1].aggregated.left
+        first_right = self.detection_buffer[0].aggregated.right
+        last_right = self.detection_buffer[-1].aggregated.right
+        return np.hypot(first_left.x - last_left.x, first_left.y - last_left.y) < self.SEARCH_STABILITY_THRESHOLD and np.hypot(first_right.x - last_right.x, first_right.y - last_right.y) < self.SEARCH_STABILITY_THRESHOLD
+    
+    def _is_tracking_deviating_from_detection(self, recheck_data: TrackingData):
+        tracking_point_left = self.tracking_data.aggregated.left
+        tracking_point_right = self.tracking_data.aggregated.right
+
+        recheck_data_left = recheck_data.aggregated.left
+        recheck_data_right = recheck_data.aggregated.right
+
+        distance_left = np.hypot(
+            recheck_data_left.x - tracking_point_left.x,
+            recheck_data_left.y - tracking_point_left.y
+        )
+        distance_right = np.hypot(
+            recheck_data_right.x - tracking_point_right.x,
+            recheck_data_right.y - tracking_point_right.y
+        )
+        
+        return distance_left > self.MAX_DIFF_OPTICALFLOW_MEDIAPIPE or distance_right > self.MAX_DIFF_OPTICALFLOW_MEDIAPIPE
+    
+    def _is_movement_plausible(self, previous_data, new_data):
+        jump_l, jump_r = self._get_eye_jumps_between_frames(previous_data, new_data)
+        disparity = self._get_disparity_between_frames(previous_data, new_data)
+        eye_dist = self._get_eye_distance_between_frames(previous_data, new_data)
+
+        return (
+            jump_l <= self.MAX_EYE_JUMP_BETWEEN_FRAMES and
+            jump_r <= self.MAX_EYE_JUMP_BETWEEN_FRAMES and
+            disparity <= self.MAX_DISPARITY_BETWEEN_FRAMES and
+            eye_dist <= self.MAX_EYE_DISTANCE_DIFFERENCE_BETWEEN_FRAMES
+        )
+    
+    def _get_eye_jumps_between_frames(self, previous_data: TrackingData, new_data: TrackingData):
+        distance_x_left_eye = new_data.aggregated.left.x - previous_data.aggregated.left.x
+        distance_y_left_eye = new_data.aggregated.left.y - previous_data.aggregated.left.y
+        distance_x_right_eye = new_data.aggregated.right.x - previous_data.aggregated.right.x
+        distance_y_right_eye = new_data.aggregated.right.y - previous_data.aggregated.right.y
+
+        return np.hypot(distance_x_left_eye, distance_y_left_eye), np.hypot(distance_x_right_eye, distance_y_right_eye)
+
+    def _get_disparity_between_frames(self, previous_data: TrackingData, new_data: TrackingData):
+        previous_disparity = previous_data.aggregated.left.x - previous_data.aggregated.right.x
+        current_disparity = new_data.aggregated.left.x - new_data.aggregated.right.x
+
+        return abs(current_disparity - previous_disparity)
+    
+    def _get_eye_distance_between_frames(self, previous_data: TrackingData, new_data: TrackingData):
+        previous_eye_distance = np.hypot(previous_data.aggregated.right.x - previous_data.aggregated.left.x, previous_data.aggregated.right.y - previous_data.aggregated.left.y)
+        current_eye_distance = np.hypot(new_data.aggregated.right.x - new_data.aggregated.left.x, new_data.aggregated.right.y - new_data.aggregated.left.y)
+        
+        return abs(previous_eye_distance - current_eye_distance)
+    
+    def _reset_detection_buffer(self):
+        self.detection_buffer.clear()
+
+    def _should_recheck(self):
+        return (
+            self.frame_count % self.RECHECK_INTERVAL == 0
+            or self.detection_buffer
+        )
+    
+    def _update_previous_frames(self, frame_left, frame_right):
+        self.previous_frame_left = frame_left.copy()
+        self.previous_frame_right = frame_right.copy()
+
+    def _decrease_confidence(self, amount=1):
+        self.tracking_confidence_counter -= amount
+        if self.tracking_confidence_counter <= self.tracking_confidence_minimum:
+            self.tracking_data = TrackingData()
+            self._reset_detection_buffer()
+            self.current_state = TrackerState.SEARCHING
 
     def _detect(self, frame_left, frame_right):
         detected_data = self._run_detection(frame_left=frame_left, frame_right=frame_right)
@@ -73,31 +150,28 @@ class EyeTracker:
         if detected_data.valid():
             self.detection_buffer.append(detected_data)
             
+            # Prüfen, ob genug Detection-Daten gesammelt
             if len(self.detection_buffer) == self.DETECTION_BUFFER_MAX_SIZE:
-                first_point = self.detection_buffer[0].aggregated.left
-                last_point = self.detection_buffer[-1].aggregated.left
-                distance = np.hypot(first_point.x - last_point.x, first_point.y - last_point.y)
-                
-                if distance < self.SEARCH_STABILITY_THRESHOLD:
+                # Abweichung innerhalb der letzten x Detection-Daten prüfen
+                if self._is_detection_stable():
+                    # Zustandswechsel zu TRACKING
                     self.tracking_data = self.detection_buffer[-1]
                     self.tracking_confidence_counter = self.tracking_confidence_init
-                    self.detection_buffer = []
+                    self._reset_detection_buffer()
                     self.current_state = TrackerState.TRACKING
-                    
-                    # WICHTIG: Bilder für den kommenden Optical Flow speichern!
-                    self.previous_frame_left, self.previous_frame_right = frame_left.copy(), frame_right.copy()
+                    self._update_previous_frames(frame_left=frame_left, frame_right=frame_right)
                 else:
-                    self.detection_buffer = []
+                    self._reset_detection_buffer()
         else:
-            self.detection_buffer = []
+            self._reset_detection_buffer()
 
     def _track(self, frame_left, frame_right): 
+        # Optical Flow auf Tracking Daten anwenden
         left_points_left_cam = np.array([p.left.as_np() for p in self.tracking_data.left.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
         left_points_right_cam = np.array([p.right.as_np() for p in self.tracking_data.left.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
         right_points_left_cam = np.array([p.left.as_np() for p in self.tracking_data.right.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
         right_points_right_cam = np.array([p.right.as_np() for p in self.tracking_data.right.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
 
-        # Optical Flow auf Tracking Daten anwenden
         next_left_points_left_cam, left_status_left_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frame_left, left_points_left_cam, None, **self.OPTICAL_FLOW_PARAMS) # type: ignore
 
         next_left_points_right_cam, left_status_right_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frame_right, left_points_right_cam, None, **self.OPTICAL_FLOW_PARAMS) # type: ignore
@@ -129,43 +203,35 @@ class EyeTracker:
             return
 
         # Plausibilitätscheck zwischen 2 aufeinanderfolgenden Frames
-        eye_jump_between_frames_left, eye_jump_between_frames_right = self.utils.get_eye_jumps_between_frames(previous_data=self.tracking_data, new_data=data)
-        disparity = self.utils.get_disparity_between_frames(previous_data=self.tracking_data, new_data=data)
-        eye_distance_between_frames = self.utils.get_eye_distance_between_frames(previous_data=self.tracking_data, new_data=data)
-
-        if eye_jump_between_frames_left > self.MAX_EYE_JUMP_BETWEEN_FRAMES or eye_jump_between_frames_right > self.MAX_EYE_JUMP_BETWEEN_FRAMES or disparity > self.MAX_DISPARITY_BETWEEN_FRAMES or eye_distance_between_frames > self.MAX_EYE_DISTANCE_DIFFERENCE_BETWEEN_FRAMES:
+        if not self._is_movement_plausible(self.tracking_data, data):
             self._decrease_confidence()
             return
         
+        # Tracking Daten akzeptieren
         self.tracking_data = data
-        self.previous_frame_left, self.previous_frame_right = frame_left.copy(), frame_right.copy()
+        self._update_previous_frames(frame_left=frame_left, frame_right=frame_right)
         self.tracking_confidence_counter = min(self.tracking_confidence_counter + 1, self.tracking_confidence_init)
     
-        # Mediapipe Recheck, wenn Intervall erreicht wurde
-        if self.frame_count % self.RECHECK_INTERVAL == 0 or len(self.detection_buffer) > 0:
+        # Periodischer Mediapipe Recheck
+        if self._should_recheck():
             recheck_data = self._run_detection(frame_left=frame_left, frame_right=frame_right)
 
             if recheck_data.valid():
                 self.detection_buffer.append(recheck_data)
 
+                # Prüfen, ob genug Detection-Daten gesammelt
                 if len(self.detection_buffer) == self.DETECTION_BUFFER_MAX_SIZE:
-                    first_bufffer_element = self.detection_buffer[0].aggregated.left
-                    last_buffer_element = self.detection_buffer[-1].aggregated.left
-
-                    distance = np.hypot(first_bufffer_element.x - last_buffer_element.x, first_bufffer_element.y - last_buffer_element.y)
-
-                    # Abweichung innerhalb der letzten x Detection-Daten muss innerhalb des Schwellwertes sein
-                    if distance < self.SEARCH_STABILITY_THRESHOLD:
-                        distance_tracking_to_detection_data = np.hypot(last_buffer_element.x - self.tracking_data.aggregated.left.x, last_buffer_element.y - self.tracking_data.aggregated.left.y) 
-
-                        # Distanz zwischen Optical Flow und Mediapipe muss innerhalb des Schwellwertes sein
-                        if distance_tracking_to_detection_data > self.MAX_DIFF_OPTICALFLOW_MEDIAPIPE:
+                    # Abweichung innerhalb der letzten x Detection-Daten prüfen
+                    if self._is_detection_stable():
+                        # Abweichtung zwischen Optical Flow und Mediapipe prüfen
+                        if self._is_tracking_deviating_from_detection(recheck_data):
+                            # Tracking-Daten mit Detection-Daten überschreiben
                             self.tracking_data = recheck_data
-                            self.previous_frame_left, self.previous_frame_right = frame_left.copy(), frame_right.copy()
-                            #self.tracking_confidence_counter = self.tracking_confidence_init
-                    self.detection_buffer = []
+                            self._update_previous_frames(frame_left=frame_left, frame_right=frame_right)
+                   
+                    self._reset_detection_buffer()
             else:
-                self.detection_buffer = []
+                self._reset_detection_buffer()
 
     def _run_detection(self, frame_left, frame_right) -> TrackingData:
         center_left = Point2D()
@@ -208,13 +274,6 @@ class EyeTracker:
                 data.aggregate_median()
 
         return data
-    
-    def _decrease_confidence(self, amount=1):
-        self.tracking_confidence_counter -= amount
-        if self.tracking_confidence_counter <= self.tracking_confidence_minimum:
-            self.tracking_data = TrackingData()
-            self.detection_buffer = []
-            self.current_state = TrackerState.SEARCHING
 
 class HandTracker:
     def __init__(self, utils: ProcessingUtils, config: Configuration):

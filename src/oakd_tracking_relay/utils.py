@@ -185,22 +185,3 @@ class ProcessingUtils:
 
         return frame_left, frame_right
     
-    def get_eye_jumps_between_frames(self, previous_data: TrackingData, new_data: TrackingData):
-        distance_x_left_eye = new_data.aggregated.left.x - previous_data.aggregated.left.x
-        distance_y_left_eye = new_data.aggregated.left.y - previous_data.aggregated.left.y
-        distance_x_right_eye = new_data.aggregated.right.x - previous_data.aggregated.right.x
-        distance_y_right_eye = new_data.aggregated.right.y - previous_data.aggregated.right.y
-
-        return np.hypot(distance_x_left_eye, distance_y_left_eye), np.hypot(distance_x_right_eye, distance_y_right_eye)
-
-    def get_disparity_between_frames(self, previous_data: TrackingData, new_data: TrackingData):
-        previous_disparity = previous_data.aggregated.left.x - previous_data.aggregated.right.x
-        current_disparity = new_data.aggregated.left.x - new_data.aggregated.right.x
-
-        return abs(current_disparity - previous_disparity)
-    
-    def get_eye_distance_between_frames(self, previous_data: TrackingData, new_data: TrackingData):
-        previous_eye_distance = np.hypot(previous_data.aggregated.right.x - previous_data.aggregated.left.x, previous_data.aggregated.right.y - previous_data.aggregated.left.y)
-        current_eye_distance = np.hypot(new_data.aggregated.right.x - new_data.aggregated.left.x, new_data.aggregated.right.y - new_data.aggregated.left.y)
-        
-        return abs(previous_eye_distance - current_eye_distance)

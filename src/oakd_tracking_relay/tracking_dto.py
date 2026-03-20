@@ -3,10 +3,6 @@ from typing import List
 from enum import Enum, auto
 from dataclasses import dataclass, field
 
-class TrackedType(Enum):
-    EYES = auto()
-    HANDS = auto()
-
 @dataclass
 class Point2D:
     x: float = 0.0
@@ -64,16 +60,9 @@ class TrackingData:
     left: StereoPointCluster = field(default_factory=StereoPointCluster)
     right: StereoPointCluster = field(default_factory=StereoPointCluster)
     aggregated: StereoPoint = field(default_factory=StereoPoint)
-    tracked_type: TrackedType = TrackedType.EYES
 
     def valid(self) -> bool: 
-            # Für Augen müssen beide vorhanden sein, bei Händen reicht eine
-            if self.tracked_type == TrackedType.EYES:
-                return self.left.valid() and self.right.valid()
-            elif self.tracked_type == TrackedType.HANDS:
-                return self.left.valid() or self.right.valid()
-            
-            return False
+        return self.left.valid() and self.right.valid()
     
     def aggregate_median(self):
         left_cam_points = []

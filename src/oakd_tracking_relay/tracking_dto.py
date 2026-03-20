@@ -40,11 +40,12 @@ class StereoPoint:
     
 @dataclass
 class StereoPointCluster:
+    MIN_TRACKING_POINTS = 2
     stereo_points: List[StereoPoint] = field(default_factory=list)
     aggregated: StereoPoint = field(default_factory=StereoPoint)
 
     def valid(self) -> bool:
-        return len(self.stereo_points) > 0
+        return len(self.stereo_points) > self.MIN_TRACKING_POINTS
 
     def aggregate_median(self):
         left_points = [p.left.as_np() for p in self.stereo_points if p.left.valid()]

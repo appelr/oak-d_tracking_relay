@@ -56,9 +56,6 @@ class EyeTracker:
         self.MAX_DISPARITY_BETWEEN_FRAMES = 10
         self.MAX_EYE_DISTANCE_DIFFERENCE_BETWEEN_FRAMES = 20
 
-        # Ab wievielen Punkten ist TrackingData valide
-        self.MIN_TRACKING_POINTS = 2
-
         self.LEFT_IRIS_INDICES = [468, 469, 470, 471, 472]
         self.RIGHT_IRIS_INDICES = [473, 474, 475, 476, 477]
 
@@ -109,14 +106,9 @@ class EyeTracker:
 
         next_right_points_right_cam, right_status_right_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frame_right, right_points_right_cam, None, **self.OPTICAL_FLOW_PARAMS) # type: ignore
 
-        # Mindestanzahl Punkte muss über Schwellwert liegen um Tracking zu starten
-        if len(left_points_left_cam) < self.MIN_TRACKING_POINTS or len(right_points_left_cam) < self.MIN_TRACKING_POINTS:
-            self._decrease_confidence(amount=2)
-            return
-
         data = TrackingData()
 
-        # DTO erstellen
+        # DTO erstellen und befüllen
         for i in range(len(left_points_left_cam)):
             if left_status_left_cam[i][0] == 1 and left_status_right_cam[i][0] == 1:
                 next_left_point_left_cam = Point2D(float(next_left_points_left_cam[i][0][0]), float(next_left_points_left_cam[i][0][1]))
@@ -129,14 +121,12 @@ class EyeTracker:
                 next_right_point_right_cam = Point2D(float(next_right_points_right_cam[i][0][0]), float(next_right_points_right_cam[i][0][1]))
                 data.right.stereo_points.append(StereoPoint(next_right_point_left_cam, next_right_point_right_cam))
 
-        # Mindestanzahl getrackter Punkte muss über Schwellwert liegen
-        if len(data.left.stereo_points) < self.MIN_TRACKING_POINTS or len(data.right.stereo_points) < self.MIN_TRACKING_POINTS:
-            self._decrease_confidence(amount=2)
-            return
-
         # Zentrum der getrackten Punkte bestimmen (Iris)
         if data.valid():
             data.aggregate_median()
+        else:
+            self._decrease_confidence(amount=2)
+            return
 
         # Plausibilitätscheck zwischen 2 aufeinanderfolgenden Frames
         eye_jump_between_frames_left, eye_jump_between_frames_right = self.utils.get_eye_jumps_between_frames(previous_data=self.tracking_data, new_data=data)

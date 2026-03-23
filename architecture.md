@@ -1,46 +1,50 @@
 stateDiagram
     direction TB
     
-    [*] --> Init
-    Init --> get_stereo_frame
+    [*] --> Initialisierung
+    Initialisierung --> get_stereo_frame
 
     state "System Loop" as System_Loop {
         direction TB
-        state "Stereo Frame abfragen" as get_stereo_frame
-        state "Split" as processing_fork
-        state "UI mit Preview und Konfigurations-Slidern" as Update_UI
+        state "Abfrage Stereo Frame" as get_stereo_frame
+        state "Vorschau-UI mit Konfigurations-Slidern" as Update_UI
         state "Tiefeninformationen berechnen" as Triangulate
+        state "Vorverarbeitung" as Preprocessing
+        state "Hand-Tracker (Background Thread)" as HandTracker
+        state "Anpassung Kamera Konfiguration" as Update_camera
+        state "Validierung der Daten" as Validate
+        state "Weitergabe der Daten" as Relay
+        
+        state processing_fork <<fork>>
 
         get_stereo_frame --> Preprocessing
         Preprocessing --> processing_fork
 
-        state Tracking {
-            state processing_fork <<fork>>
-            
-            state "Augen-Tracker (Haupt Thread)" as EyeTracker {
-                direction LR
-                Search --> Track
-                Track --> Search
-            }
-            
-            processing_fork --> EyeTracker
-            processing_fork --> HandTracker
-
-            state Tracking_Join <<join>>
-            HandTracker --> Tracking_Join
-            EyeTracker --> Triangulate
+        state "Augen-Tracker (Haupt Thread)" as EyeTracker {
+            direction LR
+            Detect --> Track
+            Track --> Detect
         }
-        Triangulate --> Tracking_Join
+        
+        processing_fork --> EyeTracker
+        processing_fork --> HandTracker
+
+        state Tracking_Join <<join>>
+        HandTracker --> Tracking_Join : Hand-Wahrheitswerte
+        EyeTracker --> Triangulate
+        Triangulate --> Tracking_Join : 3D Iris-Koordinaten
         Tracking_Join --> Validate
         Validate --> Relay
         
-        state GUI_Condition <<choice>>
-        Relay --> GUI_Condition
-        
-        GUI_Condition --> Update_UI : GUI aktiviert
-        Update_UI --> get_stereo_frame : Neue Konfiguration, falls über UI geändert
-        GUI_Condition --> get_stereo_frame : GUI deaktiviert (bessere Verarbeitungsrate)
+        Relay --> Update_UI
+    
+
+        state update_Condition <<choice>>
+        Update_UI --> update_Condition
+        update_Condition --> get_stereo_frame : Keine Konfig-Änderung
+        update_Condition --> Update_camera : Konfig-Änderung in UI vorgenommen
+        Update_camera --> get_stereo_frame
     }
-    Update_UI --> Cleanup
+    Update_UI --> Cleanup : Exit
     Cleanup --> [*]
-    Relay --> Unity
+    Relay --> Unity : UDP

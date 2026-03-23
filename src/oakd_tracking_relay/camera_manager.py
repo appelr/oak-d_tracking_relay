@@ -18,7 +18,7 @@ class OakDPro:
         try:
             # Dot Matrix führt zu schlechteren Detection Ergebnissen
             self.device.setIrLaserDotProjectorIntensity(0.0)
-            self.device.setIrFloodLightIntensity(float(self.config.ir_laser_intensity_percent/100))
+            self.device.setIrFloodLightIntensity(float(self.config.ir_intensity_percent/100))
         except: 
             pass
         
@@ -82,7 +82,7 @@ class OakDPro:
             # Dot Matrix führt zu schlechteren Detection Ergebnissen
             if self.device is not None:
                 self.device.setIrLaserDotProjectorIntensity(0.0)
-                self.device.setIrFloodLightIntensity(float(self.config.ir_laser_intensity_percent)/100)
+                self.device.setIrFloodLightIntensity(float(self.config.ir_intensity_percent)/100)
         except: 
             pass
 

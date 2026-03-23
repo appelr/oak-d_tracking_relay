@@ -43,7 +43,7 @@ class ConfigurationUI:
         cv2.setTrackbarMax(self.TRACKBAR_EXPOSURE, self.WINDOW_NAME, 9500)
 
         # Über 90% kann unerwünschtes Verhalten auftreten
-        cv2.createTrackbar(self.TRACKBAR_IR_LASER, self.WINDOW_NAME, self.config.ir_laser_intensity_percent, 0, self._nothing)
+        cv2.createTrackbar(self.TRACKBAR_IR_LASER, self.WINDOW_NAME, self.config.ir_intensity_percent, 0, self._nothing)
         cv2.setTrackbarMin(self.TRACKBAR_IR_LASER, self.WINDOW_NAME, 0)
         cv2.setTrackbarMax(self.TRACKBAR_IR_LASER, self.WINDOW_NAME, 90)
 

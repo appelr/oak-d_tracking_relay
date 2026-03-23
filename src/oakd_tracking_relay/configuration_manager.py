@@ -16,7 +16,7 @@ class Configuration:
     iso: int = 100
     exposure_us: int = 400
     apply_clahe: int = 1
-    ir_laser_intensity_percent: int = 100
+    ir_intensity_percent: int = 100
     resolution_width: int = 640
     resolution_height: int = 400
     

@@ -9,14 +9,14 @@ from oakd_tracking_relay.configuration_manager import Configuration
 from oakd_tracking_relay.tracking_dto import *
 
 class TrackerState(Enum):
-    SEARCHING = auto()
+    DETECTION = auto()
     TRACKING = auto()
 
 class EyeTracker:
     def __init__(self, utils: ProcessingUtils, config: Configuration):
         self.utils = utils
         self.config = config
-        self.current_state = TrackerState.SEARCHING
+        self.current_state = TrackerState.DETECTION
         self.tracking_data = HeadTrackingData()
         
         # MediaPipe FaceMesh 
@@ -27,12 +27,12 @@ class EyeTracker:
             min_detection_confidence=float(config.confidence_percent)/100
         )
         
-        # Schwellwerte für Wechsel Tracking -> Searching
+        # Schwellwerte für Wechsel Tracking -> Detection
         self.tracking_confidence_counter = 0
         self.tracking_confidence_init = 15
         self.tracking_confidence_minimum = 0
 
-        # Schwellwerte für Wechsel Searching -> Tracking
+        # Schwellwerte für Wechsel Detection -> Tracking
         self.detection_buffer: list[HeadTrackingData] = []        
         self.DETECTION_BUFFER_MAX_SIZE = 2
 
@@ -62,7 +62,7 @@ class EyeTracker:
     def process_stereo_frame(self, frame_left, frame_right):
         self.frame_count += 1
 
-        if self.current_state == TrackerState.SEARCHING:
+        if self.current_state == TrackerState.DETECTION:
             self._detect(frame_left=frame_left, frame_right=frame_right)
         elif self.current_state == TrackerState.TRACKING:
             self._track(frame_left=frame_left, frame_right=frame_right)
@@ -143,7 +143,7 @@ class EyeTracker:
         if self.tracking_confidence_counter <= self.tracking_confidence_minimum:
             self.tracking_data = HeadTrackingData()
             self._reset_detection_buffer()
-            self.current_state = TrackerState.SEARCHING
+            self.current_state = TrackerState.DETECTION
 
     def _detect(self, frame_left, frame_right):
         detected_data = self._run_detection(frame_left=frame_left, frame_right=frame_right)

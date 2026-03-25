@@ -67,6 +67,65 @@ class IrisTracker:
         elif self.current_state == TrackerState.TRACKING:
             self._track(frame_left=frame_left, frame_right=frame_right)
     
+    def _detect(self, frame_left, frame_right):
+        detected_data = self._run_detection(frame_left=frame_left, frame_right=frame_right)
+
+        if detected_data.valid():
+            self.detection_buffer.append(detected_data)
+            
+            # Prüfen, ob genug Detection-Daten gesammelt
+            if len(self.detection_buffer) == self.DETECTION_BUFFER_MAX_SIZE:
+                # Abweichung innerhalb der letzten x Detection-Daten prüfen
+                if self._is_detection_stable():
+                    # Zustandswechsel zu TRACKING
+                    self._switch_to_tracking(frame_left=frame_left, frame_right=frame_right)
+                else:
+                    self._reset_detection_buffer()
+        else:
+            self._reset_detection_buffer()
+
+    def _run_detection(self, frame_left, frame_right) -> HeadTrackingData:
+        center_left = Point2D()
+        center_right = Point2D()
+
+        # Bildzentrum für crop auf letzte valide TrackingData setzen
+        if self.tracking_data.valid():
+            center_left = self.tracking_data.center_between_eyes.left_cam
+            center_right = self.tracking_data.center_between_eyes.right_cam
+
+        crop_left, offset_x_left, offset_y_left = self.utils.crop_frame(frame=frame_left, center=center_left)
+        crop_right, offset_x_right, offset_y_right = self.utils.crop_frame(frame=frame_right, center=center_right)
+
+        crop_left_rgb = cv2.cvtColor(crop_left, cv2.COLOR_GRAY2RGB)
+        crop_right_rgb = cv2.cvtColor(crop_right, cv2.COLOR_GRAY2RGB)
+
+        results_left = self.model.process(crop_left_rgb)
+        results_right = self.model.process(crop_right_rgb)
+
+        data = HeadTrackingData()
+
+        # Augen-Landmark Detection
+        if results_left.multi_face_landmarks and results_right.multi_face_landmarks:
+            best_face_id = self.utils.get_best_face(results_left=results_left, results_right=results_right)
+            landmarks_left = results_left.multi_face_landmarks[best_face_id]
+            landmarks_right = results_right.multi_face_landmarks[best_face_id]
+
+            for id in self.LEFT_IRIS_INDICES:
+                left  = Point2D(offset_x_left + landmarks_left.landmark[id].x * crop_left.shape[1], offset_y_left + landmarks_left.landmark[id].y * crop_left.shape[0])
+                right = Point2D(offset_x_right + landmarks_right.landmark[id].x * crop_right.shape[1], offset_y_right + landmarks_right.landmark[id].y * crop_right.shape[0])
+                data.left_eye.stereo_points.append(StereoPoint(left, right))
+
+            for id in self.RIGHT_IRIS_INDICES:
+                left  = Point2D(offset_x_left + landmarks_left.landmark[id].x * crop_left.shape[1], offset_y_left + landmarks_left.landmark[id].y * crop_left.shape[0])
+                right = Point2D(offset_x_right + landmarks_right.landmark[id].x * crop_right.shape[1], offset_y_right + landmarks_right.landmark[id].y * crop_right.shape[0])
+                data.right_eye.stereo_points.append(StereoPoint(left, right))
+            
+            # Zentrum der gefundenen Punkte bestimmen (Iris)
+            if data.valid():
+                data.aggregate_median()
+
+        return data
+
     def _is_detection_stable(self):
         first_left = self.detection_buffer[0].center_between_eyes.left_cam
         last_left = self.detection_buffer[-1].center_between_eyes.left_cam
@@ -74,6 +133,89 @@ class IrisTracker:
         last_right = self.detection_buffer[-1].center_between_eyes.right_cam
         return np.hypot(first_left.x - last_left.x, first_left.y - last_left.y) < self.SEARCH_STABILITY_THRESHOLD and np.hypot(first_right.x - last_right.x, first_right.y - last_right.y) < self.SEARCH_STABILITY_THRESHOLD
     
+    def _reset_detection_buffer(self):
+        self.detection_buffer.clear()
+
+    def _update_previous_frames(self, frame_left, frame_right):
+        self.previous_frame_left = frame_left.copy()
+        self.previous_frame_right = frame_right.copy()
+
+    def _switch_to_tracking(self, frame_left, frame_right):
+        self.tracking_data = self.detection_buffer[-1]
+        self.tracking_confidence_counter = self.tracking_confidence_init
+        self._reset_detection_buffer()
+        self.current_state = TrackerState.TRACKING
+        self._update_previous_frames(frame_left=frame_left, frame_right=frame_right)
+
+
+    def _track(self, frame_left, frame_right): 
+        # Optical Flow auf Tracking Daten anwenden
+        left_points_left_cam = np.array([p.left_cam.as_np() for p in self.tracking_data.left_eye.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
+        left_points_right_cam = np.array([p.right_cam.as_np() for p in self.tracking_data.left_eye.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
+        right_points_left_cam = np.array([p.left_cam.as_np() for p in self.tracking_data.right_eye.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
+        right_points_right_cam = np.array([p.right_cam.as_np() for p in self.tracking_data.right_eye.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
+
+        next_left_points_left_cam, left_status_left_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frame_left, left_points_left_cam, None, **self.OPTICAL_FLOW_PARAMS) # type: ignore
+
+        next_left_points_right_cam, left_status_right_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frame_right, left_points_right_cam, None, **self.OPTICAL_FLOW_PARAMS) # type: ignore
+
+        next_right_points_left_cam, right_status_left_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frame_left, right_points_left_cam, None, **self.OPTICAL_FLOW_PARAMS) # type: ignore
+
+        next_right_points_right_cam, right_status_right_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frame_right, right_points_right_cam, None, **self.OPTICAL_FLOW_PARAMS) # type: ignore
+
+        data = HeadTrackingData()
+
+        # DTO erstellen und befüllen
+        for i in range(len(left_points_left_cam)):
+            if left_status_left_cam[i][0] == 1 and left_status_right_cam[i][0] == 1:
+                next_left_point_left_cam = Point2D(float(next_left_points_left_cam[i][0][0]), float(next_left_points_left_cam[i][0][1]))
+                netx_left_point_right_cam = Point2D(float(next_left_points_right_cam[i][0][0]), float(next_left_points_right_cam[i][0][1]))
+                data.left_eye.stereo_points.append(StereoPoint(next_left_point_left_cam, netx_left_point_right_cam))
+
+        for i in range(len(right_points_left_cam)):
+            if right_status_left_cam[i][0] == 1 and right_status_right_cam[i][0] == 1:
+                next_right_point_left_cam = Point2D(float(next_right_points_left_cam[i][0][0]), float(next_right_points_left_cam[i][0][1]))
+                next_right_point_right_cam = Point2D(float(next_right_points_right_cam[i][0][0]), float(next_right_points_right_cam[i][0][1]))
+                data.right_eye.stereo_points.append(StereoPoint(next_right_point_left_cam, next_right_point_right_cam))
+
+        # Zentrum der getrackten Punkte bestimmen (Iris)
+        if data.valid():
+            data.aggregate_median()
+        else:
+            self._decrease_confidence(amount=2)
+            return
+
+        # Plausibilitätscheck zwischen 2 aufeinanderfolgenden Frames
+        if not self._is_movement_plausible(self.tracking_data, data):
+            self._decrease_confidence()
+            return
+        
+        # Tracking Daten akzeptieren
+        self._update_tracking_data(new_tracking_data=data, frame_left=frame_left, frame_right=frame_right)
+    
+        # Periodischer Mediapipe Recheck
+        if self._should_recheck():
+            self._recheck(frame_left=frame_left, frame_right=frame_right)
+
+    def _recheck(self, frame_left, frame_right):
+        recheck_data = self._run_detection(frame_left=frame_left, frame_right=frame_right)
+        if recheck_data.valid():
+                self.detection_buffer.append(recheck_data)
+
+                # Prüfen, ob genug Detection-Daten gesammelt
+                if len(self.detection_buffer) == self.DETECTION_BUFFER_MAX_SIZE:
+                    # Abweichung innerhalb der letzten x Detection-Daten prüfen
+                    if self._is_detection_stable():
+                        # Abweichtung zwischen Optical Flow und Mediapipe prüfen
+                        if self._is_tracking_deviating_from_detection(recheck_data):
+                            # Tracking-Daten mit Detection-Daten überschreiben
+                            self.tracking_data = recheck_data
+                            self._update_previous_frames(frame_left=frame_left, frame_right=frame_right)
+                   
+                    self._reset_detection_buffer()
+        else:
+            self._reset_detection_buffer()
+
     def _is_tracking_deviating_from_detection(self, recheck_data: HeadTrackingData):
         tracking_point_left = self.tracking_data.center_between_eyes.left_cam
         tracking_point_right = self.tracking_data.center_between_eyes.right_cam
@@ -124,9 +266,6 @@ class IrisTracker:
         current_eye_distance = np.hypot(new_data.left_eye.iris.left_cam.x - new_data.right_eye.iris.left_cam.x, new_data.left_eye.iris.left_cam.y - new_data.right_eye.iris.left_cam.y)
 
         return abs(previous_eye_distance - current_eye_distance)
-    
-    def _reset_detection_buffer(self):
-        self.detection_buffer.clear()
 
     def _should_recheck(self):
         return (
@@ -134,10 +273,6 @@ class IrisTracker:
             or self.detection_buffer
         )
     
-    def _update_previous_frames(self, frame_left, frame_right):
-        self.previous_frame_left = frame_left.copy()
-        self.previous_frame_right = frame_right.copy()
-
     def _decrease_confidence(self, amount=1):
         self.tracking_confidence_counter -= amount
         if self.tracking_confidence_counter <= self.tracking_confidence_minimum:
@@ -145,142 +280,10 @@ class IrisTracker:
             self._reset_detection_buffer()
             self.current_state = TrackerState.DETECTION
             
-    def _switch_to_tracking(self, frame_left, frame_right):
-        self.tracking_data = self.detection_buffer[-1]
-        self.tracking_confidence_counter = self.tracking_confidence_init
-        self._reset_detection_buffer()
-        self.current_state = TrackerState.TRACKING
-        self._update_previous_frames(frame_left=frame_left, frame_right=frame_right)
-
-    def _detect(self, frame_left, frame_right):
-        detected_data = self._run_detection(frame_left=frame_left, frame_right=frame_right)
-
-        if detected_data.valid():
-            self.detection_buffer.append(detected_data)
-            
-            # Prüfen, ob genug Detection-Daten gesammelt
-            if len(self.detection_buffer) == self.DETECTION_BUFFER_MAX_SIZE:
-                # Abweichung innerhalb der letzten x Detection-Daten prüfen
-                if self._is_detection_stable():
-                    # Zustandswechsel zu TRACKING
-                    self._switch_to_tracking(frame_left=frame_left, frame_right=frame_right)
-                else:
-                    self._reset_detection_buffer()
-        else:
-            self._reset_detection_buffer()
-
-    def _track(self, frame_left, frame_right): 
-        # Optical Flow auf Tracking Daten anwenden
-        left_points_left_cam = np.array([p.left_cam.as_np() for p in self.tracking_data.left_eye.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
-        left_points_right_cam = np.array([p.right_cam.as_np() for p in self.tracking_data.left_eye.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
-        right_points_left_cam = np.array([p.left_cam.as_np() for p in self.tracking_data.right_eye.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
-        right_points_right_cam = np.array([p.right_cam.as_np() for p in self.tracking_data.right_eye.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
-
-        next_left_points_left_cam, left_status_left_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frame_left, left_points_left_cam, None, **self.OPTICAL_FLOW_PARAMS) # type: ignore
-
-        next_left_points_right_cam, left_status_right_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frame_right, left_points_right_cam, None, **self.OPTICAL_FLOW_PARAMS) # type: ignore
-
-        next_right_points_left_cam, right_status_left_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frame_left, right_points_left_cam, None, **self.OPTICAL_FLOW_PARAMS) # type: ignore
-
-        next_right_points_right_cam, right_status_right_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frame_right, right_points_right_cam, None, **self.OPTICAL_FLOW_PARAMS) # type: ignore
-
-        data = HeadTrackingData()
-
-        # DTO erstellen und befüllen
-        for i in range(len(left_points_left_cam)):
-            if left_status_left_cam[i][0] == 1 and left_status_right_cam[i][0] == 1:
-                next_left_point_left_cam = Point2D(float(next_left_points_left_cam[i][0][0]), float(next_left_points_left_cam[i][0][1]))
-                netx_left_point_right_cam = Point2D(float(next_left_points_right_cam[i][0][0]), float(next_left_points_right_cam[i][0][1]))
-                data.left_eye.stereo_points.append(StereoPoint(next_left_point_left_cam, netx_left_point_right_cam))
-
-        for i in range(len(right_points_left_cam)):
-            if right_status_left_cam[i][0] == 1 and right_status_right_cam[i][0] == 1:
-                next_right_point_left_cam = Point2D(float(next_right_points_left_cam[i][0][0]), float(next_right_points_left_cam[i][0][1]))
-                next_right_point_right_cam = Point2D(float(next_right_points_right_cam[i][0][0]), float(next_right_points_right_cam[i][0][1]))
-                data.right_eye.stereo_points.append(StereoPoint(next_right_point_left_cam, next_right_point_right_cam))
-
-        # Zentrum der getrackten Punkte bestimmen (Iris)
-        if data.valid():
-            data.aggregate_median()
-        else:
-            self._decrease_confidence(amount=2)
-            return
-
-        # Plausibilitätscheck zwischen 2 aufeinanderfolgenden Frames
-        if not self._is_movement_plausible(self.tracking_data, data):
-            self._decrease_confidence()
-            return
-        
-        # Tracking Daten akzeptieren
-        self._update_tracking_data(new_tracking_data=data, frame_left=frame_left, frame_right=frame_right)
-    
-        # Periodischer Mediapipe Recheck
-        if self._should_recheck():
-            recheck_data = self._run_detection(frame_left=frame_left, frame_right=frame_right)
-
-            if recheck_data.valid():
-                self.detection_buffer.append(recheck_data)
-
-                # Prüfen, ob genug Detection-Daten gesammelt
-                if len(self.detection_buffer) == self.DETECTION_BUFFER_MAX_SIZE:
-                    # Abweichung innerhalb der letzten x Detection-Daten prüfen
-                    if self._is_detection_stable():
-                        # Abweichtung zwischen Optical Flow und Mediapipe prüfen
-                        if self._is_tracking_deviating_from_detection(recheck_data):
-                            # Tracking-Daten mit Detection-Daten überschreiben
-                            self.tracking_data = recheck_data
-                            self._update_previous_frames(frame_left=frame_left, frame_right=frame_right)
-                   
-                    self._reset_detection_buffer()
-            else:
-                self._reset_detection_buffer()
-
     def _update_tracking_data(self, new_tracking_data, frame_left, frame_right):
             self.tracking_data = new_tracking_data
             self._update_previous_frames(frame_left=frame_left, frame_right=frame_right)
             self.tracking_confidence_counter = min(self.tracking_confidence_counter + 1, self.tracking_confidence_init)
-
-    def _run_detection(self, frame_left, frame_right) -> HeadTrackingData:
-        center_left = Point2D()
-        center_right = Point2D()
-
-        # Bildzentrum für crop auf letzte valide TrackingData setzen
-        if self.tracking_data.valid():
-            center_left = self.tracking_data.center_between_eyes.left_cam
-            center_right = self.tracking_data.center_between_eyes.right_cam
-
-        crop_left, offset_x_left, offset_y_left = self.utils.crop_frame(frame=frame_left, center=center_left)
-        crop_right, offset_x_right, offset_y_right = self.utils.crop_frame(frame=frame_right, center=center_right)
-
-        crop_left_rgb = cv2.cvtColor(crop_left, cv2.COLOR_GRAY2RGB)
-        crop_right_rgb = cv2.cvtColor(crop_right, cv2.COLOR_GRAY2RGB)
-
-        results_left = self.model.process(crop_left_rgb)
-        results_right = self.model.process(crop_right_rgb)
-
-        data = HeadTrackingData()
-
-        # Augen-Landmark Detection
-        if results_left.multi_face_landmarks and results_right.multi_face_landmarks:
-            best_face_id = self.utils.get_best_face(results_left=results_left, results_right=results_right)
-            landmarks_left = results_left.multi_face_landmarks[best_face_id]
-            landmarks_right = results_right.multi_face_landmarks[best_face_id]
-
-            for id in self.LEFT_IRIS_INDICES:
-                left  = Point2D(offset_x_left + landmarks_left.landmark[id].x * crop_left.shape[1], offset_y_left + landmarks_left.landmark[id].y * crop_left.shape[0])
-                right = Point2D(offset_x_right + landmarks_right.landmark[id].x * crop_right.shape[1], offset_y_right + landmarks_right.landmark[id].y * crop_right.shape[0])
-                data.left_eye.stereo_points.append(StereoPoint(left, right))
-
-            for id in self.RIGHT_IRIS_INDICES:
-                left  = Point2D(offset_x_left + landmarks_left.landmark[id].x * crop_left.shape[1], offset_y_left + landmarks_left.landmark[id].y * crop_left.shape[0])
-                right = Point2D(offset_x_right + landmarks_right.landmark[id].x * crop_right.shape[1], offset_y_right + landmarks_right.landmark[id].y * crop_right.shape[0])
-                data.right_eye.stereo_points.append(StereoPoint(left, right))
-            
-            # Zentrum der gefundenen Punkte bestimmen (Iris)
-            if data.valid():
-                data.aggregate_median()
-
-        return data
 
 class HandTracker:
     def __init__(self, utils: ProcessingUtils, config: Configuration):

@@ -44,13 +44,15 @@ stateDiagram-v2
             state driftdetection <<choice>>
             state "TrackingData updaten" as updatetrackingdata2
             state confidencecheck <<choice>>
+            state "Confidence erhöhen" as increaseconfidence
             state "TrackerState -> DETECTION" as switchtodetection
 
             opticalflow --> validtracking
             validtracking --> decreaseconfidence: TrackingData invalid
             validtracking --> plausibletracking : TrackingData valid
             plausibletracking --> decreaseconfidence : TrackingData nicht plausibel
-            plausibletracking --> updatetrackingdata : TrackingData plausibel
+            plausibletracking --> increaseconfidence : TrackingData plausibel
+            increaseconfidence --> updatetrackingdata
             decreaseconfidence --> confidencecheck
             confidencecheck --> [*] : Confidence über Minimum
             confidencecheck --> switchtodetection : Confidence unter Minimum
@@ -61,7 +63,7 @@ stateDiagram-v2
             driftdetection --> [*] : Kein OpticalFlow Drift
             updatetrackingdata2 --> [*]
             recheck --> [*] : RecheckInterval nicht erreicht
-            recheck --> detect2 : RecheckInterval erreicht
+            recheck --> detect2 : RecheckInterval erreicht oder Detection Buffer ist nicht leer
 
             state "Recheck" as recheckblock{
                 detect2 --> driftdetection

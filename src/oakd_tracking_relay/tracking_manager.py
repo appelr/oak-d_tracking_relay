@@ -212,9 +212,7 @@ class IrisTracker:
             return
         
         # Tracking Daten akzeptieren
-        self.tracking_data = data
-        self._update_previous_frames(frame_left=frame_left, frame_right=frame_right)
-        self.tracking_confidence_counter = min(self.tracking_confidence_counter + 1, self.tracking_confidence_init)
+        self._update_tracking_data(new_tracking_data=data, frame_left=frame_left, frame_right=frame_right)
     
         # Periodischer Mediapipe Recheck
         if self._should_recheck():
@@ -237,7 +235,10 @@ class IrisTracker:
             else:
                 self._reset_detection_buffer()
 
-    def _recheck(self, )
+    def _update_tracking_data(self, new_tracking_data, frame_left, frame_right):
+            self.tracking_data = new_tracking_data
+            self._update_previous_frames(frame_left=frame_left, frame_right=frame_right)
+            self.tracking_confidence_counter = min(self.tracking_confidence_counter + 1, self.tracking_confidence_init)
 
     def _run_detection(self, frame_left, frame_right) -> HeadTrackingData:
         center_left = Point2D()

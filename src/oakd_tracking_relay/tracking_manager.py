@@ -12,7 +12,7 @@ class TrackerState(Enum):
     DETECTION = auto()
     TRACKING = auto()
 
-class EyeTracker:
+class IrisTracker:
     def __init__(self, utils: ProcessingUtils, config: Configuration):
         self.utils = utils
         self.config = config
@@ -144,6 +144,13 @@ class EyeTracker:
             self.tracking_data = HeadTrackingData()
             self._reset_detection_buffer()
             self.current_state = TrackerState.DETECTION
+            
+    def _switch_to_tracking(self, frame_left, frame_right):
+        self.tracking_data = self.detection_buffer[-1]
+        self.tracking_confidence_counter = self.tracking_confidence_init
+        self._reset_detection_buffer()
+        self.current_state = TrackerState.TRACKING
+        self._update_previous_frames(frame_left=frame_left, frame_right=frame_right)
 
     def _detect(self, frame_left, frame_right):
         detected_data = self._run_detection(frame_left=frame_left, frame_right=frame_right)
@@ -156,11 +163,7 @@ class EyeTracker:
                 # Abweichung innerhalb der letzten x Detection-Daten prüfen
                 if self._is_detection_stable():
                     # Zustandswechsel zu TRACKING
-                    self.tracking_data = self.detection_buffer[-1]
-                    self.tracking_confidence_counter = self.tracking_confidence_init
-                    self._reset_detection_buffer()
-                    self.current_state = TrackerState.TRACKING
-                    self._update_previous_frames(frame_left=frame_left, frame_right=frame_right)
+                    self._switch_to_tracking(frame_left=frame_left, frame_right=frame_right)
                 else:
                     self._reset_detection_buffer()
         else:
@@ -233,6 +236,8 @@ class EyeTracker:
                     self._reset_detection_buffer()
             else:
                 self._reset_detection_buffer()
+
+    def _recheck(self, )
 
     def _run_detection(self, frame_left, frame_right) -> HeadTrackingData:
         center_left = Point2D()

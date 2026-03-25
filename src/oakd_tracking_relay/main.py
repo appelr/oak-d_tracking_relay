@@ -30,7 +30,7 @@ def main():
                     if show_configuration_ui:
                         ui = ConfigurationUI(camera=camera, config=config)
 
-                    eye_tracker = EyeTracker(utils=utils, config=config)
+                    iris_tracker = IrisTracker(utils=utils, config=config)
                     hand_tracker = HandTracker(utils=utils, config=config)
 
                     # Hände asynchron, da nicht relevant für real time tracking
@@ -51,7 +51,7 @@ def main():
                         if config.apply_clahe == 1:
                             frame_left, frame_right = utils.apply_clahe_to_stereo_frame(frame_left=frame_left, frame_right=frame_right)
                         
-                        eye_tracker.process_stereo_frame(frame_left=frame_left, frame_right=frame_right)
+                        iris_tracker.process_stereo_frame(frame_left=frame_left, frame_right=frame_right)
 
                         if hand_tracking_task is None or hand_tracking_task.done():
                             
@@ -72,9 +72,9 @@ def main():
                             print(f"Tracking mit ~{round(data_rate)} verarbeiteten Bildern pro Sekunde.", flush=True, end="\r")
 
 
-                        if eye_tracker.current_state == TrackerState.TRACKING and eye_tracker.tracking_data.valid():
-                            iris_left_stereo = eye_tracker.tracking_data.left_eye.iris
-                            iris_right_stereo = eye_tracker.tracking_data.right_eye.iris
+                        if iris_tracker.current_state == TrackerState.TRACKING and iris_tracker.tracking_data.valid():
+                            iris_left_stereo = iris_tracker.tracking_data.left_eye.iris
+                            iris_right_stereo = iris_tracker.tracking_data.right_eye.iris
                             iris_left_3D = utils.triangulate_stereo_point(stereo_point=iris_left_stereo)
                             iris_right_3D = utils.triangulate_stereo_point(stereo_point=iris_right_stereo)
 
@@ -96,7 +96,7 @@ def main():
                             else:
                                 ui.update_config_if_changed()
                                 ui.change_display_frame(display_frame=frame_left)
-                                ui.draw_eye_landmarks(tracking_data=eye_tracker.tracking_data)
+                                ui.draw_eye_landmarks(tracking_data=iris_tracker.tracking_data)
                                 ui.draw_hand_quadrants(upper_left=hand_upper_left, lower_left=hand_lower_left, upper_right=hand_upper_right, lower_right=hand_lower_right)
                                 ui.draw_info()
                                 ui.show()

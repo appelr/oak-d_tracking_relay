@@ -17,7 +17,7 @@ class IrisTracker:
         self.utils = utils
         self.config = config
         self.current_state = TrackerState.DETECTION
-        self.tracking_data = HeadTrackingData()
+        self.tracking_data = TrackingData()
         
         # MediaPipe FaceMesh 
         self.model = mp.solutions.face_mesh.FaceMesh( # type: ignore
@@ -33,7 +33,7 @@ class IrisTracker:
         self.tracking_confidence_minimum = 0
 
         # Schwellwerte für Wechsel Detection -> Tracking
-        self.detection_buffer: list[HeadTrackingData] = []        
+        self.detection_buffer: list[TrackingData] = []        
         self.DETECTION_BUFFER_MAX_SIZE = 2
 
         # Counter für Mediapipe Recheck
@@ -84,7 +84,7 @@ class IrisTracker:
         else:
             self._reset_detection_buffer()
 
-    def _run_detection(self, frame_left, frame_right) -> HeadTrackingData:
+    def _run_detection(self, frame_left, frame_right) -> TrackingData:
         center_left = Point2D()
         center_right = Point2D()
 
@@ -102,7 +102,7 @@ class IrisTracker:
         results_left = self.model.process(crop_left_rgb)
         results_right = self.model.process(crop_right_rgb)
 
-        data = HeadTrackingData()
+        data = TrackingData()
 
         # Augen-Landmark Detection
         if results_left.multi_face_landmarks and results_right.multi_face_landmarks:
@@ -163,7 +163,7 @@ class IrisTracker:
 
         next_right_points_right_cam, right_status_right_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_right, frame_right, right_points_right_cam, None, **self.OPTICAL_FLOW_PARAMS) # type: ignore
 
-        data = HeadTrackingData()
+        data = TrackingData()
 
         # DTO erstellen und befüllen
         for i in range(len(left_points_left_cam)):
@@ -216,7 +216,7 @@ class IrisTracker:
         else:
             self._reset_detection_buffer()
 
-    def _is_tracking_deviating_from_detection(self, recheck_data: HeadTrackingData):
+    def _is_tracking_deviating_from_detection(self, recheck_data: TrackingData):
         tracking_point_left = self.tracking_data.center_between_eyes.left_cam
         tracking_point_right = self.tracking_data.center_between_eyes.right_cam
 
@@ -246,7 +246,7 @@ class IrisTracker:
             eye_dist <= self.MAX_EYE_DISTANCE_DIFFERENCE_BETWEEN_FRAMES
         )
     
-    def _get_eye_jumps_between_frames(self, previous_data: HeadTrackingData, new_data: HeadTrackingData):
+    def _get_eye_jumps_between_frames(self, previous_data: TrackingData, new_data: TrackingData):
         distance_x_left_eye = new_data.left_eye.iris.left_cam.x - previous_data.left_eye.iris.left_cam.x
         distance_y_left_eye = new_data.left_eye.iris.left_cam.y - previous_data.left_eye.iris.left_cam.y
         distance_x_right_eye = new_data.right_eye.iris.left_cam.x - previous_data.right_eye.iris.left_cam.x
@@ -254,13 +254,13 @@ class IrisTracker:
 
         return np.hypot(distance_x_left_eye, distance_y_left_eye), np.hypot(distance_x_right_eye, distance_y_right_eye)
 
-    def _get_disparity_between_frames(self, previous_data: HeadTrackingData, new_data: HeadTrackingData):
+    def _get_disparity_between_frames(self, previous_data: TrackingData, new_data: TrackingData):
         previous_disparity = previous_data.center_between_eyes.left_cam.x - previous_data.center_between_eyes.right_cam.x
         current_disparity = new_data.center_between_eyes.left_cam.x - new_data.center_between_eyes.right_cam.x
 
         return abs(current_disparity - previous_disparity)
     
-    def _get_eye_distance_between_frames(self, previous_data: HeadTrackingData, new_data: HeadTrackingData):
+    def _get_eye_distance_between_frames(self, previous_data: TrackingData, new_data: TrackingData):
         previous_eye_distance = np.hypot(previous_data.left_eye.iris.left_cam.x - previous_data.right_eye.iris.left_cam.x, previous_data.left_eye.iris.left_cam.y - previous_data.right_eye.iris.left_cam.y)
 
         current_eye_distance = np.hypot(new_data.left_eye.iris.left_cam.x - new_data.right_eye.iris.left_cam.x, new_data.left_eye.iris.left_cam.y - new_data.right_eye.iris.left_cam.y)
@@ -276,7 +276,7 @@ class IrisTracker:
     def _decrease_confidence(self, amount=1):
         self.tracking_confidence_counter -= amount
         if self.tracking_confidence_counter <= self.tracking_confidence_minimum:
-            self.tracking_data = HeadTrackingData()
+            self.tracking_data = TrackingData()
             self._reset_detection_buffer()
             self.current_state = TrackerState.DETECTION
             

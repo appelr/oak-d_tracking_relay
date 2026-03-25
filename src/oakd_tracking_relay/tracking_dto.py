@@ -56,7 +56,7 @@ class EyeStereoPointCluster:
             self.iris.right_cam = Point2D(*median)
 
 @dataclass
-class HeadTrackingData:
+class TrackingData:
     left_eye: EyeStereoPointCluster = field(default_factory=EyeStereoPointCluster)
     right_eye: EyeStereoPointCluster = field(default_factory=EyeStereoPointCluster)
     center_between_eyes: StereoPoint = field(default_factory=StereoPoint)

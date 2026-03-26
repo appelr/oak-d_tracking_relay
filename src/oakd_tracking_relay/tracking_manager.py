@@ -17,7 +17,7 @@ class IrisTracker:
         self.utils = utils
         self.config = config
         self.current_state = TrackerState.DETECTION
-        self.tracking_data = TrackingData()
+        self.current_tracking_data = TrackingData()
         
         # MediaPipe FaceMesh 
         self.model = mp.solutions.face_mesh.FaceMesh( # type: ignore
@@ -89,9 +89,9 @@ class IrisTracker:
         center_right = Point2D()
 
         # Bildzentrum für crop auf letzte valide TrackingData setzen
-        if self.tracking_data.valid():
-            center_left = self.tracking_data.center_between_eyes.left_cam
-            center_right = self.tracking_data.center_between_eyes.right_cam
+        if self.current_tracking_data.valid():
+            center_left = self.current_tracking_data.center_between_eyes.left_cam
+            center_right = self.current_tracking_data.center_between_eyes.right_cam
 
         crop_left, offset_x_left, offset_y_left = self.utils.crop_frame(frame=frame_left, center=center_left)
         crop_right, offset_x_right, offset_y_right = self.utils.crop_frame(frame=frame_right, center=center_right)
@@ -141,7 +141,7 @@ class IrisTracker:
         self.previous_frame_right = frame_right.copy()
 
     def _switch_to_tracking(self, frame_left, frame_right):
-        self.tracking_data = self.detection_buffer[-1]
+        self.current_tracking_data = self.detection_buffer[-1]
         self.tracking_confidence_counter = self.tracking_confidence_init
         self._reset_detection_buffer()
         self.current_state = TrackerState.TRACKING
@@ -150,10 +150,10 @@ class IrisTracker:
 
     def _track(self, frame_left, frame_right): 
         # Optical Flow auf Tracking Daten anwenden
-        left_points_left_cam = np.array([p.left_cam.as_np() for p in self.tracking_data.left_eye.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
-        left_points_right_cam = np.array([p.right_cam.as_np() for p in self.tracking_data.left_eye.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
-        right_points_left_cam = np.array([p.left_cam.as_np() for p in self.tracking_data.right_eye.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
-        right_points_right_cam = np.array([p.right_cam.as_np() for p in self.tracking_data.right_eye.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
+        left_points_left_cam = np.array([p.left_cam.as_np() for p in self.current_tracking_data.left_eye.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
+        left_points_right_cam = np.array([p.right_cam.as_np() for p in self.current_tracking_data.left_eye.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
+        right_points_left_cam = np.array([p.left_cam.as_np() for p in self.current_tracking_data.right_eye.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
+        right_points_right_cam = np.array([p.right_cam.as_np() for p in self.current_tracking_data.right_eye.stereo_points], dtype=np.float32).reshape(-1, 1, 2)
 
         next_left_points_left_cam, left_status_left_cam, _ = cv2.calcOpticalFlowPyrLK(self.previous_frame_left, frame_left, left_points_left_cam, None, **self.OPTICAL_FLOW_PARAMS) # type: ignore
 
@@ -186,7 +186,7 @@ class IrisTracker:
             return
 
         # Plausibilitätscheck zwischen 2 aufeinanderfolgenden Frames
-        if not self._is_movement_plausible(self.tracking_data, data):
+        if not self._is_movement_plausible(self.current_tracking_data, data):
             self._decrease_confidence()
             return
         
@@ -209,7 +209,7 @@ class IrisTracker:
                         # Abweichtung zwischen Optical Flow und Mediapipe prüfen
                         if self._is_tracking_deviating_from_detection(recheck_data):
                             # Tracking-Daten mit Detection-Daten überschreiben
-                            self.tracking_data = recheck_data
+                            self.current_tracking_data = recheck_data
                             self._update_previous_frames(frame_left=frame_left, frame_right=frame_right)
                    
                     self._reset_detection_buffer()
@@ -217,8 +217,8 @@ class IrisTracker:
             self._reset_detection_buffer()
 
     def _is_tracking_deviating_from_detection(self, recheck_data: TrackingData):
-        tracking_point_left = self.tracking_data.center_between_eyes.left_cam
-        tracking_point_right = self.tracking_data.center_between_eyes.right_cam
+        tracking_point_left = self.current_tracking_data.center_between_eyes.left_cam
+        tracking_point_right = self.current_tracking_data.center_between_eyes.right_cam
 
         recheck_data_left = recheck_data.center_between_eyes.left_cam
         recheck_data_right = recheck_data.center_between_eyes.right_cam
@@ -276,12 +276,12 @@ class IrisTracker:
     def _decrease_confidence(self, amount=1):
         self.tracking_confidence_counter -= amount
         if self.tracking_confidence_counter <= self.tracking_confidence_minimum:
-            self.tracking_data = TrackingData()
+            self.current_tracking_data = TrackingData()
             self._reset_detection_buffer()
             self.current_state = TrackerState.DETECTION
             
     def _update_tracking_data(self, new_tracking_data, frame_left, frame_right):
-            self.tracking_data = new_tracking_data
+            self.current_tracking_data = new_tracking_data
             self._update_previous_frames(frame_left=frame_left, frame_right=frame_right)
             self.tracking_confidence_counter = min(self.tracking_confidence_counter + 1, self.tracking_confidence_init)
 

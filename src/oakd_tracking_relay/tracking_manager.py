@@ -331,17 +331,25 @@ class HandTracker:
                     found_lower_right = True
 
         # Anpassen der Patience
-        if found_upper_left: self.missing_upper_left = 0
-        else: self.missing_upper_left += 1
+        if found_upper_left: 
+            self.missing_upper_left = 0
+        else: 
+            self.missing_upper_left += 1
             
-        if found_lower_left: self.missing_lower_left = 0
-        else: self.missing_lower_left += 1
+        if found_lower_left: 
+            self.missing_lower_left = 0
+        else: 
+            self.missing_lower_left += 1
 
-        if found_upper_right: self.missing_upper_right = 0
-        else: self.missing_upper_right += 1
+        if found_upper_right: 
+            self.missing_upper_right = 0
+        else: 
+            self.missing_upper_right += 1
             
-        if found_lower_right: self.missing_lower_right = 0
-        else: self.missing_lower_right += 1
+        if found_lower_right: 
+            self.missing_lower_right = 0
+        else: 
+            self.missing_lower_right += 1
 
         upper_left = self.missing_upper_left < self.patience
         lower_left = self.missing_lower_left < self.patience

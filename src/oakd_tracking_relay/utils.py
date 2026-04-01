@@ -30,8 +30,9 @@ class ProcessingUtils:
         extrinsics = np.array(calibration_data.getCameraExtrinsics(dai.CameraBoardSocket.CAM_B, dai.CameraBoardSocket.CAM_C))
         
         self.rotation = extrinsics[:3, :3]
+        
+        # * 10 für Umwandlung in mm
         self.translation = extrinsics[:3, 3].reshape(3,1) * 10
-
         self.baseline = calibration_data.getBaselineDistance() * 10
 
         image_size = (self.config.resolution_width, self.config.resolution_height)

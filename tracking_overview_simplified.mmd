@@ -1,0 +1,27 @@
+stateDiagram 
+    direction TB
+
+    [*] --> Initialisierung
+    Initialisierung --> get_stereo_frame
+
+    state "System Loop" as System_Loop {
+        state processing_fork <<fork>>
+        state "Hybrides Iris-Tracking" as EyeTracker
+        state "Hand-Tracking" as HandTracker
+        get_stereo_frame --> Preprocessing
+        Preprocessing --> processing_fork
+
+        processing_fork --> EyeTracker
+        processing_fork --> HandTracker
+
+        EyeTracker --> Triangulate
+
+        state Tracking_Join <<join>>
+
+        Triangulate --> Tracking_Join
+        HandTracker --> Tracking_Join
+
+        Tracking_Join --> Relay
+    }
+    Relay --> Unity : UDP
+

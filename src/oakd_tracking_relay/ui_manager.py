@@ -70,7 +70,7 @@ class ConfigurationUI:
             "iso": cv2.getTrackbarPos(self.TRACKBAR_ISO, self.WINDOW_NAME),
             "exposure_us": cv2.getTrackbarPos(self.TRACKBAR_EXPOSURE, self.WINDOW_NAME),
             "apply_clahe": cv2.getTrackbarPos(self.TRACKBAR_APPLY_CLAHE, self.WINDOW_NAME),
-            "ir_laser_intensity_percent": cv2.getTrackbarPos(self.TRACKBAR_IR_LASER, self.WINDOW_NAME),
+            "ir_intensity_percent": cv2.getTrackbarPos(self.TRACKBAR_IR_LASER, self.WINDOW_NAME),
             "confidence_percent": cv2.getTrackbarPos(self.TRACKBAR_CONFIDENCE, self.WINDOW_NAME),
         }
 

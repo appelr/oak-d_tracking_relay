@@ -39,7 +39,7 @@ A high-performance, close-to-real-time stereo vision tracking system utilizing t
    ```
 ## Configuration
 
-The application is configured via the built in *Visual Config UI* or directly using the `config.json` file located in the root directory. 
+The application is configured via the built in *Visual Config UI* or directly using the `config.json` file located in the root directory. It is created on the first system start.
 Key parameters include:
 * Camera ISO, Exposure and IR Laser
 * CLAHE (Contrast Limited Adaptive Histogram Equalization) settings for IR enhancement.
@@ -66,4 +66,4 @@ Ensure your receiving application listens to the port specified in `config.json`
 * **Hands:** Transmitted as four boolean values representing the active quadrants (Top-Left, Bottom-Left, Top-Right, Bottom-Right).
 
 ---
-*Developed for robust, real-time spatial interaction.*
+*Developed for robust, close-to-real-time spatial interaction.*

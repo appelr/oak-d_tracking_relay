@@ -4,13 +4,13 @@ A high-performance, close-to-real-time stereo vision tracking system utilizing t
 
 ## Key Features
 
-* **Hybrid Eye Tracking (3D):** Uses *MediaPipe FaceMesh* for initial detection and **Lucas-Kanade Optical Flow** to track the relevant landmarks. This ensures rigid, high-speed tracking of the iris across frames without the overhead of running a neural network continuously. Points are triangulated into real 3D space.
+* **Hybrid Eye Tracking (3D):** Uses *MediaPipe FaceMesh* for initial detection and **Lucas-Kanade Optical Flow** to track the relevant landmarks. This ensures rigid, high-speed tracking of the iris across frames without the overhead of running the neural network continuously. Points are triangulated into real 3D space.
 
 * **Asynchronous Hand Quadrant Detection:** Uses *MediaPipe Hands* to detect hand presence in four screen zones (Top-Left, Bottom-Left, Top-Right, Bottom-Right). Runs entirely in a background thread to prevent main-loop blocking.
 
-* **High FPS Architecture:** By only using the cpu heavy *MediaPipe* as a detector and switching to the fast *Optical Flow* for Tracking, the application maintains high and stable data rates of up to 100 results / second.
+* **High FPS Architecture:** By only using the cpu heavy *MediaPipe* as a detector and switching to the fast *Optical Flow* for Tracking, the application maintains high and stable data rates of up to 65-100 results / second depending on the cpu used.
 
-* **Real-time UDP Telemetry:** Broadcasts the triangulated 3D eye coordinates and the boolean hand quadrant states to configurable network destinations.
+* **Real-time UDP Relay:** Broadcasts the triangulated 3D eye coordinates and the boolean hand quadrant states to configurable network destinations.
 
 * **Visual Config UI:** Provides a live camera feed with tracking point visualization and sliders for configuring the camera and tracking settings.
 

@@ -2,10 +2,12 @@ stateDiagram
     direction TB
 
     [*] --> Initialisierung
+    state "Stereo Frame abfragen" as get_stereo_frame
     Initialisierung --> get_stereo_frame
 
     state "System Loop" as System_Loop {
         state processing_fork <<fork>>
+        state "Triangulierung" as Triangulate
         state "Hybrides Iris-Tracking" as EyeTracker
         state "Hand-Tracking" as HandTracker
         get_stereo_frame --> Preprocessing
@@ -14,12 +16,12 @@ stateDiagram
         processing_fork --> EyeTracker
         processing_fork --> HandTracker
 
-        EyeTracker --> Triangulate
+        EyeTracker --> Triangulate : 2D Koordinaten
 
         state Tracking_Join <<join>>
 
-        Triangulate --> Tracking_Join
-        HandTracker --> Tracking_Join
+        Triangulate --> Tracking_Join : 3D Weltkoordinaten
+        HandTracker --> Tracking_Join : Hand Wahrheitswerte
 
         Tracking_Join --> Relay
     }

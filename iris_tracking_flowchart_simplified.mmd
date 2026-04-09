@@ -1,0 +1,45 @@
+stateDiagram
+    direction LR
+    
+
+    state "DETECTION" as DETECTION {
+        state "MediaPipe FaceMesh" as detect
+        state "Buffer leeren" as emptyBuffer
+        state "Zu Buffer hinzufügen" as addToBuffer
+
+    
+        [*] --> detect : aktuelles Stereo Frame
+        state detect <<choice>>
+
+        detect --> addToBuffer : gültig
+        addToBuffer --> [*] : Buffer nicht voll
+        addToBuffer --> [*] : Buffer voll<br>und stabil
+        addToBuffer --> emptyBuffer : Buffer voll<br>und nicht stabil
+        emptyBuffer --> [*]
+        detect --> emptyBuffer : ungültig
+
+     
+
+    }
+
+    state "TRACKING" as TRACKING {
+        state "OpticalFlow" as flow
+        state "Confidence erhöhen" as increaseConfidence
+        state "Confidence verringern" as decreaseConfidence
+        state "Drift korrigieren" as correctDrift
+        state "MediaPipe Recheck" as recheck
+        [*] --> flow : aktuelles Stereo Frame<br>vorheriges Stereo Frame
+
+        state flow <<choice>>
+        flow --> decreaseConfidence : nicht plausibel
+        decreaseConfidence --> [*]
+        flow --> increaseConfidence: plausibel
+        increaseConfidence --> recheck : Recheck Intervall<br>erreicht
+        increaseConfidence --> [*] : Recheck Intervall<br>nicht erreicht
+        recheck --> [*]  : kein Drift
+        recheck --> correctDrift : Drift
+        correctDrift --> [*]
+    }
+
+    DETECTION --> TRACKING  : Detection-Buffer<br>gefüllt & stabil
+    TRACKING  --> DETECTION : Tracking-Confidence<br>unter Schwellwert
